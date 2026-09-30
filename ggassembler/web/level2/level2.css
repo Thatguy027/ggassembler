@@ -447,6 +447,18 @@
   text-align: center;
 }
 .callout-text { display: flex; flex-direction: column; min-width: 0; }
+
+/* Load-bearing, and it looks removable. `.callout.is-left .callout-text` sets
+   `align-items: flex-end` to right-align the two lines, and in a column flex
+   container the cross axis is the horizontal one: any `align-items` other than
+   `stretch` sizes children to their *content* across it. So the child never
+   inherits a width to be capped by, and the `overflow: hidden` and
+   `text-overflow: ellipsis` below have nothing to act against - a 306px meta
+   line rendered at full width inside a 143px box and escaped 78px past the
+   left edge of the map. This restores the cap without giving up the
+   alignment. Deleting it does not change the right-hand callouts at all,
+   which is what makes it look safe. */
+.callout-text > * { max-width: 100%; }
 .callout-name {
   font-size: 12px;
   font-weight: 600;

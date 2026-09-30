@@ -353,6 +353,60 @@ def test_no_layer_of_the_map_is_resized_in_pixels(client):
                     )
 
 
+def test_a_right_aligned_callout_still_caps_its_own_width(client):
+    """`align-items: flex-end` switches off the width cap, and nothing says so.
+
+    In a column flex container the cross axis is horizontal, so any
+    `align-items` other than `stretch` sizes children to their content across
+    it. The Type 8 callout's meta line rendered 306px wide inside a 143px box
+    and escaped 78px past the left edge of the map - with `overflow: hidden`
+    and `white-space: nowrap` both set on it, because neither can do anything
+    without a width to overflow.
+
+    `max-width: 100%` on the children restores the cap. It reads like a no-op
+    and is not; the right-hand callouts, which are `stretch`, are genuinely
+    unaffected by it, which is exactly why it looks removable.
+    """
+    css = client.get("/static/level2/level2.css").text
+
+    alignment = [
+        line for line in css.splitlines()
+        if ".callout-text" in line and "align-items" in line and "stretch" not in line
+    ]
+    if not alignment:
+        return  # no longer aligned that way, so the cap is not needed
+
+    for start in _occurrences(css, ".callout-text > * {"):
+        if "max-width: 100%" in css[start:css.index("}", start)]:
+            break
+    else:
+        raise AssertionError(
+            "`.callout-text` children are aligned to an edge "
+            f"({alignment[0].strip()}) but never capped: add "
+            "`.callout-text > * { max-width: 100%; }`"
+        )
+
+
+def test_the_callout_lines_still_ask_to_be_truncated(client):
+    """The cap only helps alongside the overflow rules it exists to enable.
+
+    Every block for the selector is searched, not the first one found: these
+    names are also used inside a narrow-screen media query that sets only a
+    font size, and taking that block as *the* rule is how a CSS assertion ends
+    up passing or failing on text it was never about.
+    """
+    css = client.get("/static/level2/level2.css").text
+    for selector in (".callout-name", ".callout-meta"):
+        blocks = [
+            css[start:css.index("}", start)]
+            for start in _occurrences(css, f"{selector} {{")
+        ]
+        assert blocks, f"{selector} is not styled at all"
+        assert any("nowrap" in b for b in blocks), f"{selector} would wrap, not truncate"
+        assert any("overflow: hidden" in b for b in blocks), f"{selector} would spill"
+        assert any("ellipsis" in b for b in blocks), f"{selector} truncates with no sign of it"
+
+
 def _occurrences(text, needle):
     at, out = text.find(needle), []
     while at != -1:
