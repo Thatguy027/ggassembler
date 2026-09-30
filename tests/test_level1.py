@@ -126,8 +126,8 @@ def test_primer_segments_cover_the_tail(library):
 
 
 def test_type_3_strips_the_stop_and_adds_the_gly_ser_linker(library):
-    """The fusion path, asked for explicitly - a terminal stop otherwise wins."""
-    fusable = level1.Convention(infer_from_sequence=False)
+    """The fusion path, asked for explicitly - it is never the default."""
+    fusable = level1.Convention(gly_ser_linker=True, infer_from_sequence=False)
     result = level1.design(library, request_for("3", conventions=fusable))
     assert "stop_stripped" in result.codes()
     assert "gly_ser" in result.codes()
@@ -144,6 +144,113 @@ def test_conventions_can_be_turned_off(library):
     assert result.body.endswith("TAA")
 
 
+def test_the_gly_ser_linker_is_off_unless_it_is_asked_for(library):
+    """The default, asserted on its own so it cannot quietly flip back.
+
+    It is not free: the two bases become a Gly-Ser on the protein whether or
+    not a fusion follows, so a part that does not need them should not get
+    them. Every other test here that wants the linker now says so.
+    """
+    assert level1.Convention().gly_ser_linker is False
+
+    body = "GCTACCGAAGCTTGGACC" * 8                      # no terminal stop
+    result = level1.design(library, request_for("3", sequence=body))
+    assert "gly_ser" not in result.codes()
+    assert not result.body.endswith("GG")
+
+
+def test_the_linker_without_stripping_the_stop_is_a_warning(library):
+    """Both ticked together is a part that looks fusable and is not.
+
+    The junction would read TAA GGATCC: translation stops at the TAA and the
+    linker is never reached. Which of the two was meant is not knowable from
+    here, so it is said rather than silently corrected.
+    """
+    contradictory = level1.Convention(
+        gly_ser_linker=True, strip_stop=False, infer_from_sequence=False
+    )
+    result = level1.design(library, request_for("3", conventions=contradictory))
+    assert "linker_without_strip" in result.codes()
+    assert any(
+        i.level == level1.WARNING for i in result.issues if i.code == "linker_without_strip"
+    )
+
+
+def test_stripping_the_stop_without_the_linker_is_not_a_warning(library):
+    """The ordinary case, and the new default: a part that ends where it ends."""
+    plain = level1.Convention(strip_stop=True, infer_from_sequence=False)
+    result = level1.design(library, request_for("3", conventions=plain))
+    assert "linker_without_strip" not in result.codes()
+
+
+def test_a_part_that_cannot_read_through_says_so():
+    """The mirror of the gly_ser note: leaving it off otherwise says nothing.
+
+    The consequence only shows up later, when a 4a fusion is put after this
+    part and lands out of frame - a 4 nt overhang is not a whole codon.
+    """
+    body = "GCTACCGAAGCTTGGACC" * 8
+    _, _, _, issues = level1.apply_conventions(
+        body, "3", level1.Convention(), fusion_downstream=True
+    )
+    note = next(i for i in issues if i.code == "no_read_through")
+    assert "ATCC" in note.message and "4a" in note.message
+    assert note.level == level1.INFO
+
+
+def test_the_read_through_note_names_the_right_flank_for_3a():
+    body = "GCTACCGAAGCTTGGACC" * 8
+    _, _, _, issues = level1.apply_conventions(
+        body, "3a", level1.Convention(), fusion_downstream=True
+    )
+    assert "TTCT" in next(i for i in issues if i.code == "no_read_through").message
+
+
+def test_the_read_through_note_stays_quiet_with_no_4a_part_on_the_shelf(library):
+    """Advice about a fusion this library cannot build is noise, not help."""
+    assert not library.parts_of_type("4a")
+    body = "GCTACCGAAGCTTGGACC" * 8
+    result = level1.design(library, request_for("3", sequence=body))
+    assert "no_read_through" not in result.codes()
+
+
+def test_no_read_through_note_when_the_linker_is_on():
+    body = "GCTACCGAAGCTTGGACC" * 8
+    _, _, suffix, issues = level1.apply_conventions(
+        body, "3", level1.Convention(gly_ser_linker=True), fusion_downstream=True
+    )
+    codes = {i.code for i in issues}
+    assert "no_read_through" not in codes and "gly_ser" in codes
+    assert suffix == "GG"
+
+
+def test_no_read_through_note_when_the_sequence_ends_in_a_stop():
+    """The terminal-stop note already covers it, and says more."""
+    _, _, _, issues = level1.apply_conventions(
+        CDS, "3", level1.Convention(), fusion_downstream=True
+    )
+    codes = {i.code for i in issues}
+    assert "terminal_cds" in codes
+    assert "no_read_through" not in codes
+
+
+def test_the_terminal_stop_advice_matches_what_was_asked_for(library):
+    """Telling someone to tick a box they already ticked is how a note stops
+    being read."""
+    default = level1.design(library, request_for("3"))
+    assert "tick \u201cGly-Ser linker\u201d" in _message(default, "terminal_cds")
+
+    asked = level1.design(
+        library,
+        request_for("3", conventions=level1.Convention(gly_ser_linker=True)),
+    )
+    assert "untick" in _message(asked, "terminal_cds")
+
+
+def _message(result, code):
+    return next(i for i in result.issues if i.code == code).message
+
+
 def test_type_4_leads_with_a_stop_and_an_xhoi_site(library):
     result = level1.design(library, request_for("4"))
     assert result.body.startswith("TAACTCGAG")
@@ -151,7 +258,8 @@ def test_type_4_leads_with_a_stop_and_an_xhoi_site(library):
 
 
 def test_type_3a_adds_gg_before_ttct(library):
-    result = level1.design(library, request_for("3a"))
+    fusable = level1.Convention(gly_ser_linker=True)
+    result = level1.design(library, request_for("3a", conventions=fusable))
     assert result.body.endswith("GG")
     assert (result.body + result.three_prime).endswith("GGTTCT")
 
@@ -737,7 +845,7 @@ def test_convention_bases_ride_in_the_tail_not_the_anneal(library):
     """The Gly-Ser GG must be spelled by the primer, not read off the template."""
     from ggassembler.core.seqio import revcomp
 
-    fusable = level1.Convention(infer_from_sequence=False)
+    fusable = level1.Convention(gly_ser_linker=True, infer_from_sequence=False)
     result = level1.design(library, request_for("3", conventions=fusable))
     reverse = result.fragments[0].reverse
     tail = reverse.sequence[: len(reverse.sequence) - len(reverse.annealing)]
@@ -778,14 +886,16 @@ def test_a_cds_that_ends_in_a_stop_is_kept_as_one(library):
 
 
 def test_a_cds_without_a_stop_still_gets_the_fusion_conventions(library):
+    """The inference stays out of the way; the linker itself is still asked for."""
     body = "GCTACCGAAGCTTGGACC" * 8                      # no stop, no frame claim
-    result = level1.design(library, request_for("3", sequence=body))
+    fusable = level1.Convention(gly_ser_linker=True)
+    result = level1.design(library, request_for("3", sequence=body, conventions=fusable))
     assert "terminal_cds" not in result.codes()
     assert "gly_ser" in result.codes()
 
 
 def test_the_inference_can_be_overridden(library):
-    conv = level1.Convention(infer_from_sequence=False)
+    conv = level1.Convention(gly_ser_linker=True, infer_from_sequence=False)
     result = level1.design(library, request_for("3", conventions=conv))
     assert "terminal_cds" not in result.codes()
     assert "gly_ser" in result.codes() and "stop_stripped" in result.codes()

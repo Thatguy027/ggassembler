@@ -177,3 +177,104 @@ textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; 
 .junction-vector { color: var(--ink-2); }
 .junction-insert { color: var(--accent); }
 .junction-nick { color: var(--ink-3); }
+
+/* The Gly-Ser linker is locked while the trailing stop is kept: with the stop
+ * in, the junction reads TAA GGATCC and the linker is never translated. The
+ * reason is on the label's title, so it is readable rather than just dead. */
+.conventions label.is-locked {
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+.conventions label.is-locked input { cursor: not-allowed; }
+
+/* ------------------------------------------------------------- explainers */
+
+.conv-row { display: flex; align-items: center; gap: 4px; }
+.conv-row > label { flex-grow: 1; min-width: 0; }
+
+/* The glyph is small; the target is not. 24px is the floor for something you
+ * are meant to be able to hit without aiming. */
+.info {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.info svg { width: 15px; height: 15px; }
+.info:hover { color: var(--accent); background: var(--chip); }
+.info:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.info[aria-expanded='true'] { color: var(--accent); background: var(--chip); }
+
+.explainer { position: relative; gap: 0; }
+.explainer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.explainer-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-3);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.explainer-close:hover { background: var(--chip); color: var(--ink); }
+.explainer-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.ex-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  margin-right: 30px;
+  margin-bottom: 8px;
+}
+.explainer p { font-size: 12.5px; line-height: 1.6; color: var(--ink-2); margin-bottom: 8px; }
+.ex-head {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  margin: 12px 0 5px;
+}
+.ex-when { margin: 0 0 4px 16px; }
+.ex-when li { font-size: 12.5px; line-height: 1.6; color: var(--ink-2); margin-bottom: 5px; }
+
+.ex-example {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+}
+.ex-caption { font-size: 11.5px !important; color: var(--ink-3) !important; }
+.ex-seq {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink);
+  overflow-x: auto;
+  margin-bottom: 8px;
+}
+
+/* the three kinds of base an example tells apart */
+.ex-added    { color: var(--accent); font-weight: 500; }
+.ex-overhang { color: var(--part-1); font-weight: 500; }
+.ex-supplied { color: var(--ok); font-weight: 500; }
+
+.ex-key { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 8px; }
+.ex-key li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-3); }
+.ex-swatch { width: 9px; height: 9px; border-radius: 2px; background: currentColor; }
+.explainer .ex-example p:last-child { margin-bottom: 0; }

@@ -8,6 +8,8 @@
  * through the detector to prove it reads as the type that was asked for.
  */
 
+import { EXPLAINERS, explainerNode } from './explainers.js';
+
 const state = {
   part_type: '3',
   template: '',
@@ -17,7 +19,7 @@ const state = {
   entry_vector: null,
   mode: 'pcr',
   name: 'new_part',
-  conventions: { gly_ser_linker: true, strip_stop: true, stop_and_xhoi: true },
+  conventions: { gly_ser_linker: false, strip_stop: true, stop_and_xhoi: true },
   domesticate: false,
 };
 
@@ -526,6 +528,22 @@ function applyRegion() {
   refresh();
 }
 
+/* The linker and stripping the stop are one mechanism, so the UI does not let
+ * them be set to disagree. Disabled rather than merely flagged: there is no
+ * reading of "linker on, stop kept" that does anything, and a checkbox you can
+ * tick to no effect is worse than one you cannot tick. */
+function lockLinkerToStrip() {
+  const linker = el('c-glyser');
+  const usable = el('c-stop').checked;
+  linker.disabled = !usable;
+  if (!usable) linker.checked = false;
+  el('l-glyser').classList.toggle('is-locked', !usable);
+  el('l-glyser').title = usable
+    ? ''
+    : 'Needs \u201cStrip a trailing stop codon\u201d: with the stop kept, the junction '
+      + 'reads TAA GGATCC and the linker is never translated.';
+}
+
 function read() {
   state.part_type = el('part-type').value || '3';
   state.template = el('template').value || null;
@@ -536,6 +554,12 @@ function read() {
   state.destination = state.entry_vector;
   state.domesticate = el('c-domesticate').checked;
   state.name = el('name').value.trim() || 'new_part';
+  // The linker only means anything alongside stripping the stop: with the stop
+  // left in, the junction reads TAA GGATCC and it is never translated. Locked
+  // rather than merely warned about, so the two cannot be set to disagree here
+  // in the first place; the API still warns, for callers that are not this page.
+  lockLinkerToStrip();
+
   state.conventions = {
     gly_ser_linker: el('c-glyser').checked,
     strip_stop: el('c-stop').checked,
@@ -674,6 +698,78 @@ el('save-btn').addEventListener('click', async () => {
   const result = await post('/api/level1/save', state);
   button.textContent = result.ok ? 'Saved' : 'Could not save';
   setTimeout(() => { button.textContent = 'Save to library'; button.disabled = false; }, 2000);
+});
+
+/* ------------------------------------------------------------- explainers ---
+ *
+ * One panel, shared by every ⓘ. Not a tooltip: these run to several paragraphs
+ * and a worked sequence, and a tooltip can hold neither that nor a keyboard.
+ *
+ * Focus moves to the panel when it opens and back to the ⓘ that opened it when
+ * it closes, so reading one does not cost you your place in the form.
+ */
+
+const SVG = 'http://www.w3.org/2000/svg';
+let openExplainer = null;
+
+/** The glyph: drawn, not a letter, so it reads the same in every font. */
+function infoGlyph() {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  for (const [tag, attrs] of [
+    ['circle', { cx: 8, cy: 8, r: 6.25, 'stroke-width': 1.3 }],
+    ['path', { d: 'M8 7.4v3.9', 'stroke-width': 1.3, 'stroke-linecap': 'round' }],
+    ['path', { d: 'M8 4.8v0.9', 'stroke-width': 1.5, 'stroke-linecap': 'round' }],
+  ]) {
+    const node = document.createElementNS(SVG, tag);
+    node.setAttribute('fill', 'none');
+    node.setAttribute('stroke', 'currentColor');
+    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+    svg.append(node);
+  }
+  return svg;
+}
+
+function infoButtons() {
+  return [...document.querySelectorAll('.info[data-explains]')];
+}
+
+function closeExplainer(focus = true) {
+  const opener = infoButtons().find((b) => b.dataset.explains === openExplainer);
+  openExplainer = null;
+  el('explainer').hidden = true;
+  el('explainer-body').replaceChildren();
+  for (const button of infoButtons()) button.setAttribute('aria-expanded', 'false');
+  if (focus && opener) opener.focus();
+}
+
+function showExplainer(id) {
+  const entry = EXPLAINERS[id];
+  if (!entry) return;
+  if (openExplainer === id) { closeExplainer(); return; }
+
+  openExplainer = id;
+  for (const button of infoButtons()) {
+    button.setAttribute('aria-expanded', String(button.dataset.explains === id));
+  }
+  const panel = el('explainer');
+  el('explainer-body').replaceChildren(explainerNode(entry));
+  panel.hidden = false;
+  panel.focus();
+  // the panel sits in the other column and can be well below the fold on a
+  // short window; opening something the reader cannot see is not opening it
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+for (const button of infoButtons()) {
+  button.append(infoGlyph());
+  button.addEventListener('click', () => showExplainer(button.dataset.explains));
+}
+el('explainer-close').addEventListener('click', () => closeExplainer());
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && openExplainer) closeExplainer();
 });
 
 load();

@@ -75,14 +75,29 @@ STOP_CODONS = ("TAA", "TAG", "TGA")
 class Convention:
     """The YTK sequence conventions for particular part types."""
 
-    gly_ser_linker: bool = True
-    """Type 3/3b: append ``GG`` before ``ATCC`` so the junction reads ``GGATCC``."""
+    gly_ser_linker: bool = False
+    """Type 3/3b: append ``GG`` before ``ATCC`` so the junction reads ``GGATCC``.
+
+    Off by default, because it is not free: those two bases become a Gly-Ser on
+    the protein whether or not a fusion follows. With a plain Type 4 terminator
+    the product is Gly-Ser-stop, two residues longer than the native sequence -
+    "relatively innocuous", in the paper's words, which is not the same as
+    nothing. A part only needs it when something is going to read through it,
+    so it is asked for rather than assumed.
+
+    Only does anything alongside `strip_stop`: with the stop left in, the
+    junction reads ``TAA GGATCC`` and the linker is never translated.
+    """
     strip_stop: bool = True
     """Type 3: drop a trailing stop codon, since the terminator follows."""
     stop_and_xhoi: bool = True
     """Type 4/4a: begin with ``TAA`` then ``CTCGAG``."""
     strip_start: bool = True
-    """Type 3/3a: drop a leading ``ATG``, because the ``TATG`` overhang is one."""
+    """Type 3/3a: drop a leading ``ATG``, because the ``TATG`` overhang is one.
+
+    Paste a CDS straight out of a genome browser and it begins with its start
+    codon; the part's own 5' overhang already spells it, so keeping both would
+    put two methionines at the front."""
     infer_from_sequence: bool = True
     """Let a terminal stop codon settle whether this CDS is meant to be fused.
 
@@ -91,11 +106,6 @@ class Convention:
     a different molecule, and one whose primers will not match the sequence that
     was pasted. So when a terminal in-frame stop is present, the fusion
     conventions stay out of the way unless they are asked for explicitly."""
-    """Type 3/3a: drop a leading ``ATG``, because the ``TATG`` overhang is one.
-
-    Paste a CDS straight out of a genome browser and it begins with its start
-    codon; the part's own 5' overhang already spells it, so keeping both would
-    put two methionines at the front."""
 
 
 @dataclass
@@ -331,7 +341,7 @@ def trim_to_insert(
 
 
 def apply_conventions(
-    body: str, part_type: str, convention: Convention
+    body: str, part_type: str, convention: Convention, fusion_downstream: bool = False
 ) -> tuple[str, str, str, list[Issue]]:
     """Fold in the YTK sequence rules for this part type.
 
@@ -343,19 +353,47 @@ def apply_conventions(
     issues: list[Issue] = []
     body = body.upper()
     prefix = suffix = ""
+    asked_for_linker = convention.gly_ser_linker
+
+    # The two options are one mechanism, and only work together. With the stop
+    # left in, the ligated junction reads TAA GGATCC: the ribosome stops at the
+    # TAA and the linker is never translated, so the part looks fusable on the
+    # screen and is not in the tube. A warning rather than a silent correction,
+    # because which of the two the person meant is not knowable from here.
+    if (
+        part_type in ("3", "3a", "3b")
+        and convention.gly_ser_linker
+        and not convention.strip_stop
+    ):
+        issues.append(
+            Issue(WARNING, "linker_without_strip",
+                  "the Gly-Ser linker does nothing while the trailing stop codon is "
+                  "kept: the junction would read TAA GGATCC and translation stops at "
+                  "the TAA. Turn on \u201cStrip a trailing stop codon\u201d, or turn the "
+                  "linker off")
+        )
 
     terminal_stop = (
         part_type in ("3", "3b")
         and len(body) % 3 == 0
         and body[-3:] in STOP_CODONS
     )
-    if terminal_stop and convention.infer_from_sequence:
+    kept_as_ending = terminal_stop and convention.infer_from_sequence
+    if kept_as_ending:
         convention = replace(convention, strip_stop=False, gly_ser_linker=False)
+        # What to suggest depends on what was asked for. Telling someone to
+        # tick a box they already ticked is how a message stops being read.
+        advice = (
+            "untick \u201cLet a terminal stop codon mean this CDS ends here\u201d to "
+            "make a fusable part instead"
+            if asked_for_linker else
+            "tick \u201cGly-Ser linker\u201d to make a fusable part instead"
+        )
         issues.append(
             Issue(INFO, "terminal_cds",
                   f"this sequence ends in an in-frame {body[-3:]}, so it is being kept as "
                   f"a CDS that ends here: the stop stays and no Gly-Ser GG is added. "
-                  f"Tick \u201cGly-Ser linker\u201d to make a fusable part instead")
+                  f"{advice}")
         )
 
     if part_type in ("3", "3a") and convention.strip_start and body.startswith("ATG"):
@@ -397,6 +435,28 @@ def apply_conventions(
     elif part_type == "3a" and convention.gly_ser_linker:
         suffix = "GG"
         issues.append(Issue(INFO, "gly_ser", "appended GG before TTCT for the 3a/3b read-through"))
+
+    # The mirror of the two notes above. Adding the linker says so; leaving it
+    # out says nothing at all, and the consequence only shows up later, when a
+    # 4a fusion is put after this part and comes out in the wrong frame. Only
+    # raised where a C-terminal fusion is a thing this library could actually
+    # do - with no Type 4a part on the shelf it is noise.
+    elif (
+        part_type in CODING_TYPES
+        and not convention.gly_ser_linker
+        and fusion_downstream
+        # the terminal-stop note above already says this, in more detail
+        and not kept_as_ending
+    ):
+        after = "TTCT" if part_type == "3a" else "ATCC"
+        issues.append(
+            Issue(INFO, "no_read_through",
+                  f"no Gly-Ser GG was added, so this part ends flush against {after} and "
+                  f"will not read through to a C-terminal fusion: the 4 nt overhang is "
+                  f"not a whole codon and anything downstream would be out of frame. "
+                  f"Fine for a part that ends here; tick “Gly-Ser linker” if a "
+                  f"Type 4a part is to follow")
+        )
 
     if part_type in ("4", "4a") and convention.stop_and_xhoi:
         prefix = "TAACTCGAG"
@@ -998,7 +1058,9 @@ def design(library: Library, request: PartRequest) -> Level1Design:
         issues += trim_issues
 
     core, prefix, suffix, convention_issues = apply_conventions(
-        body, request.part_type, request.conventions
+        body, request.part_type, request.conventions,
+        # whether a C-terminal fusion is something this library could build
+        fusion_downstream=bool(library.parts_of_type("4a")),
     )
     issues += convention_issues
     body = prefix + core + suffix

@@ -83,18 +83,60 @@
 
           <fieldset class="conventions">
             <legend class="lbl">Sequence conventions</legend>
-            <label><input type="checkbox" id="c-glyser" checked> Gly-Ser linker (GG before the 3&prime; flank)</label>
-            <label>
-              <input type="checkbox" id="c-infer" checked>
-              Let a terminal stop codon mean &ldquo;this CDS ends here&rdquo;
-            </label>
-            <label><input type="checkbox" id="c-start" checked> Type 3: drop a leading ATG (TATG supplies it)</label>
-            <label><input type="checkbox" id="c-stop" checked> Strip a trailing stop codon</label>
-            <label><input type="checkbox" id="c-xhoi" checked> Type 4: lead with TAA + CTCGAG</label>
-            <label>
-              <input type="checkbox" id="c-domesticate">
-              Remove internal BsaI / BsmBI / BbsI / NotI sites by silent mutation
-            </label>
+
+            <!-- Each ⓘ sits outside its <label> on purpose: inside one, clicking
+                 the button would also toggle the checkbox it explains. -->
+            <div class="conv-row">
+              <label id="l-glyser">
+                <input type="checkbox" id="c-glyser">
+                Gly-Ser linker (GG before the 3&prime; flank)
+              </label>
+              <button class="info" type="button" data-explains="c-glyser"
+                      aria-label="About: Gly-Ser linker"
+                      aria-expanded="false" aria-controls="explainer"></button>
+            </div>
+
+            <div class="conv-row">
+              <label>
+                <input type="checkbox" id="c-infer" checked>
+                Let a terminal stop codon mean &ldquo;this CDS ends here&rdquo;
+              </label>
+              <button class="info" type="button" data-explains="c-infer"
+                      aria-label="About: Let a terminal stop codon mean this CDS ends here"
+                      aria-expanded="false" aria-controls="explainer"></button>
+            </div>
+
+            <div class="conv-row">
+              <label><input type="checkbox" id="c-start" checked> Type 3: drop a leading ATG (TATG supplies it)</label>
+              <button class="info" type="button" data-explains="c-start"
+                      aria-label="About: Type 3: drop a leading ATG"
+                      aria-expanded="false" aria-controls="explainer"></button>
+            </div>
+
+            <div class="conv-row">
+              <label><input type="checkbox" id="c-stop" checked> Strip a trailing stop codon</label>
+              <button class="info" type="button" data-explains="c-stop"
+                      aria-label="About: Strip a trailing stop codon"
+                      aria-expanded="false" aria-controls="explainer"></button>
+            </div>
+
+            <div class="conv-row">
+              <label><input type="checkbox" id="c-xhoi" checked> Type 4: lead with TAA + CTCGAG</label>
+              <button class="info" type="button" data-explains="c-xhoi"
+                      aria-label="About: Type 4: lead with TAA + CTCGAG"
+                      aria-expanded="false" aria-controls="explainer"></button>
+            </div>
+
+            <div class="conv-row">
+              <label>
+                <input type="checkbox" id="c-domesticate">
+                Remove internal BsaI / BsmBI / BbsI / NotI sites by silent mutation
+              </label>
+              <button class="info" type="button" data-explains="c-domesticate"
+                      aria-label="About: Remove internal sites by silent mutation"
+                      aria-expanded="false" aria-controls="explainer"></button>
+            </div>
+
             <span class="card-note">
               Off by default: in a promoter or terminator no base change is truly
               silent, so the scan reports what it would do and leaves the call to you.
@@ -151,6 +193,16 @@
             <label class="lbl" for="alt">Order this</label>
             <textarea id="alt" rows="5" class="mono" readonly></textarea>
           </div>
+        </section>
+
+        <!-- One panel for every ⓘ, rather than a tooltip each. These
+             explanations run to several paragraphs and a worked sequence;
+             a tooltip cannot hold that and cannot be read with the keyboard. -->
+        <section class="card pad explainer" id="explainer" hidden
+                 tabindex="-1" aria-live="polite" aria-labelledby="explainer-title">
+          <button class="explainer-close" type="button" id="explainer-close"
+                  aria-label="Close explanation">&times;</button>
+          <div id="explainer-body"></div>
         </section>
       </div>
     </div>
