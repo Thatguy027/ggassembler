@@ -538,3 +538,52 @@ def test_a_split_part_turns_the_panel_split_on(tmp_path):
     assert found.split_3, "a 3a/3b pair has to open the split view"
     assert found.selections.get("3a") == "part3a"
     assert "3" not in found.selections
+
+
+def test_an_unexplained_stretch_reports_the_position_it_occupies(tmp_path):
+    """"1,750 bp of type 3 that isn't a part I know" beats "1,750 bp unexplained".
+
+    The four bases at each end of the gap are the overhangs the missing part
+    was ligated by, and they name its position even when the part itself is
+    nowhere in the library.
+    """
+    for part_type, name in CANONICAL.items():
+        write_genbank(
+            synth.part_plasmid(part_type, name=name, seed=synth.seed_for(name)),
+            tmp_path / f"{name}.gb",
+        )
+    library = Library(tmp_path)
+    library.scan()
+    built = level2.build(library, level2.CassetteDesign(selections=dict(CANONICAL)))
+    write_genbank(built.product, tmp_path / "built.gb")
+
+    # take the type 3 part off the shelf: its stretch is now unexplained
+    (tmp_path / f"{CANONICAL['3']}.gb").unlink()
+    library = Library(tmp_path)
+    library.scan()
+
+    found = level2.decompose(library, library.get("built"))
+    assert len(found.unmatched) == 1
+    gap = found.unmatched[0]
+    assert gap.part_type == "3", f"the gap should name position 3, got {gap.part_type}"
+    assert gap.left_overhang == "TATG" and gap.right_overhang == "ATCC"
+    assert gap.length > 0
+
+
+def test_the_old_gap_shape_still_works_for_callers_that_only_count(tmp_path):
+    for part_type, name in CANONICAL.items():
+        write_genbank(
+            synth.part_plasmid(part_type, name=name, seed=synth.seed_for(name)),
+            tmp_path / f"{name}.gb",
+        )
+    library = Library(tmp_path)
+    library.scan()
+    built = level2.build(library, level2.CassetteDesign(selections=dict(CANONICAL)))
+    write_genbank(built.product, tmp_path / "built.gb")
+    (tmp_path / f"{CANONICAL['3']}.gb").unlink()
+    library = Library(tmp_path)
+    library.scan()
+
+    found = level2.decompose(library, library.get("built"))
+    assert found.gaps == [(u.start, u.length) for u in found.unmatched]
+    assert not found.complete

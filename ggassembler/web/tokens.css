@@ -397,6 +397,14 @@ input[type='text'], input[type='search'] {
 }
 input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+/* ------------------------------------------------------------------ hidden */
+/* The UA sheet's `[hidden] { display: none }` is a plain author-level rule, so
+ * any class that sets `display` beats it - and every panel here sets one. That
+ * is how `.clone-report { display: flex }` left an empty teal bar on the page
+ * on every load, with the `hidden` attribute set and doing nothing. */
+
+[hidden] { display: none !important; }
+
 /* ------------------------------------------------------------------ guide */
 /* A slim strip at the top of each screen. Collapsed it still carries the one
  * sentence that matters most on that page, so it teaches without taking room;

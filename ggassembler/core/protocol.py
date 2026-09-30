@@ -45,9 +45,13 @@ REAGENTS: tuple[tuple[str, float, str], ...] = (
 CUT_TEMPERATURE = {"BsaI": 37, "BsmBI": 42, "Esp3I": 42, "BbsI": 37}
 DEFAULT_CUT_TEMPERATURE = 37
 
-#: Cycles of cut-and-ligate. The YTK paper uses 25 for a full eight-part
-#: assembly; fewer is enough for two or three pieces but costs nothing.
-CYCLES = 25
+#: Cycles of cut-and-ligate.
+CYCLES = 30
+
+#: What a plasmid is assumed to be at when nobody has measured it. Every volume
+#: derived from this is a guess, so a component using it says so on its own row
+#: rather than passing the number off as a measurement.
+ASSUMED_CONC = 50.0
 
 
 @dataclass(frozen=True)
@@ -65,6 +69,8 @@ class Component:
     fmol: float | None = None
     ng: float | None = None
     volume_ul: float | None = None
+    measured: bool = True
+    """False when the volume rests on the assumed concentration, not a reading."""
     note: str = ""
 
     @property
@@ -91,7 +97,10 @@ class Reaction:
     components: list[Component] = field(default_factory=list)
     steps: list[Step] = field(default_factory=list)
     issues: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+    """Things to know before running it, which are not problems with it."""
     selection: str = ""
+    reversed_dropout: bool = False
 
     @property
     def ok(self) -> bool:
@@ -104,8 +113,9 @@ class Reaction:
 
     @property
     def missing(self) -> list[str]:
+        """Components whose volume rests on the assumed concentration."""
         return [c.name for c in self.components
-                if c.kind in ("part", "destination") and not c.known]
+                if c.kind in ("part", "destination") and not c.measured]
 
 
 def molecular_weight(length_bp: int) -> float:
@@ -144,36 +154,49 @@ def _dna_component(
     path: str = "",
 ) -> Component:
     ng = ng_for(fmol, length)
-    if not conc_ng_ul or conc_ng_ul <= 0:
-        return Component(
-            name=name, kind=kind, path=path, length=length, conc_ng_ul=None,
-            fmol=fmol, ng=_round(ng), volume_ul=None,
-            note="no concentration recorded - measure the prep and enter it in the Library",
-        )
+    measured = bool(conc_ng_ul and conc_ng_ul > 0)
+    conc = conc_ng_ul if measured else ASSUMED_CONC
     return Component(
-        name=name, kind=kind, path=path, length=length, conc_ng_ul=conc_ng_ul,
-        fmol=fmol, ng=_round(ng), volume_ul=_round(volume_for(ng, conc_ng_ul)),
-        note=f"{_round(ng)} ng at {conc_ng_ul:g} ng/µL",
+        name=name, kind=kind, path=path, length=length, conc_ng_ul=conc,
+        fmol=fmol, ng=_round(ng), volume_ul=_round(volume_for(ng, conc)),
+        measured=measured,
+        note=(
+            f"{_round(ng)} ng at {conc:g} ng/µL"
+            if measured
+            else f"{_round(ng)} ng, assuming {ASSUMED_CONC:g} ng/µL - measure this prep"
+        ),
     )
 
 
-def cycling(enzyme: Enzyme | str, cycles: int = CYCLES) -> list[Step]:
+def cycling(
+    enzyme: Enzyme | str,
+    cycles: int = CYCLES,
+    reversed_dropout: bool = False,
+) -> list[Step]:
     """The thermocycler programme for a one-pot digest-ligate reaction.
 
     The cutting temperature is the enzyme's own; everything else is the same
     whichever Type IIS enzyme is driving the assembly.
+
+    A reversed-site dropout in the reaction ends the programme after cycling:
+    no final digest, no heat inactivation. What takes their place is
+    counter-selection, which `reaction` notes alongside.
     """
     name = enzyme if isinstance(enzyme, str) else enzyme.name
     cut = CUT_TEMPERATURE.get(name, DEFAULT_CUT_TEMPERATURE)
-    return [
+    steps = [
         Step(f"{cycles}× cycle",
              f"{cut} °C 5 min → 16 °C 5 min "
              f"({name} cuts, ligase seals)"),
-        Step("Final digest",
-             f"{cut} °C 10 min (linearises anything that re-formed uncut)"),
-        Step("Inactivate", "80 °C 10 min"),
-        Step("Hold", "4 °C"),
     ]
+    if not reversed_dropout:
+        steps += [
+            Step("Final digest",
+                 f"{cut} °C 10 min (linearises anything that re-formed uncut)"),
+            Step("Inactivate", "80 °C 10 min"),
+        ]
+    steps.append(Step("Hold", "4 °C"))
+    return steps
 
 
 def reaction(
@@ -184,6 +207,7 @@ def reaction(
     fmol_each: float = DEFAULT_FMOL,
     total_ul: float = DEFAULT_VOLUME,
     selection: str = "",
+    reversed_dropout: bool = False,
 ) -> Reaction:
     """Build the reaction table for one assembly.
 
@@ -197,7 +221,8 @@ def reaction(
         total_ul=total_ul,
         fmol_each=fmol_each,
         selection=selection,
-        steps=cycling(enzyme_name),
+        reversed_dropout=reversed_dropout,
+        steps=cycling(enzyme_name, reversed_dropout=reversed_dropout),
     )
 
     if destination:
@@ -237,12 +262,23 @@ def reaction(
 
     missing = out.missing
     if missing:
-        out.issues.append(
-            f"{len(missing)} component(s) have no recorded concentration "
-            f"({', '.join(missing[:4])}{'…' if len(missing) > 4 else ''}): "
-            "enter ng/µL on the Library screen and the volumes fill in."
+        # a note, not an issue: the reaction is complete and pipettable, it is
+        # just resting on an assumption that a nanodrop would settle
+        out.notes.append(
+            f"{len(missing)} component(s) have no measured concentration and are "
+            f"costed at {ASSUMED_CONC:g} ng/µL "
+            f"({', '.join(missing[:4])}{'…' if len(missing) > 4 else ''}). "
+            "Enter the real figures on the Library screen for volumes you can trust."
         )
-    if water < 0 and not missing:
+    if reversed_dropout:
+        out.notes.append(
+            "This reaction includes a dropout whose enzyme sites leave on the "
+            "fragment, so the programme stops after cycling: no final digest and "
+            "no heat inactivation. Expect a higher rate of misassembly than a "
+            "site-free reaction, and counter-screen on chloramphenicol rather "
+            "than trusting colony colour alone."
+        )
+    if water < 0:
         out.issues.append(
             f"the DNA alone comes to {_round(used)} µL, more than the "
             f"{total_ul:g} µL reaction. Dilute the most concentrated preps, "
@@ -274,6 +310,9 @@ def as_text(rx: Reaction) -> str:
 
     if rx.selection:
         lines += ["", f"Selection: {rx.selection}"]
+    if rx.notes:
+        lines += ["", "Worth knowing", "-" * 13]
+        lines += [f"  - {note}" for note in rx.notes]
     if rx.issues:
         lines += ["", "Before you set this up", "-" * 22]
         lines += [f"  ! {issue}" for issue in rx.issues]

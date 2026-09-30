@@ -37,8 +37,9 @@ CACHE_DIR = ".ggasm"
 INDEX_FILE = "index.json"
 OVERRIDES_FILE = "overrides.json"
 DESIGNS_FILE = "designs.json"
+BUILDS_FILE = "builds.jsonl"
 CONFIG_FILE = "config.json"
-INDEX_VERSION = 10
+INDEX_VERSION = 11
 
 #: Confidence levels, best first.
 DIGEST, ANNOTATION, FILENAME, NONE = "digest", "annotation", "filename", "none"
@@ -304,6 +305,11 @@ class PlasmidEntry:
     aliases: list[str] = field(default_factory=list)
     """Other filenames holding this exact sequence, merged into this entry."""
     features: list[FeatureInfo] = field(default_factory=list)
+    level3_ready: bool | None = None
+    """For a type 1 or 5 part: whether it still carries the multigene enzyme's
+    site, and so whether a cassette built with it could ever be released for a
+    multigene assembly. `None` where the question does not arise - every other
+    position contributes nothing to the cassette's ends."""
     conc_ng_ul: float | None = None
     """What a prep of this plasmid measured at. A property of the tube, not of
     the sequence, so it is kept in the overrides file rather than read from the
@@ -817,6 +823,78 @@ def features_within(
     return inside
 
 
+def remap_features(
+    features: list[FeatureInfo],
+    span: tuple[int, int] | None,
+    length: int,
+    offset: int,
+    part_length: int,
+    limit: int = 8,
+    min_length: int = 60,
+    max_coverage: float = 0.9,
+) -> list[FeatureInfo]:
+    """The features inside `span`, moved into the coordinates of a product.
+
+    A part sits at one place in its own plasmid and somewhere else entirely in
+    the construct built from it, so a map of the product cannot reuse either
+    set of numbers. `span` says where the fragment sits in the source; `offset`
+    says where that fragment starts in the product; everything in between is
+    the same arithmetic `features_within` already does, kept here so there is
+    one answer to "is this feature in this part" rather than two.
+
+    What comes back is the part's *substructure*, which is why so much is
+    dropped. A feature covering essentially the whole part says nothing the
+    part does not already say, and drawn on a ring just inside the part band it
+    reads as a second, paler copy of that band - two rings of the same thing.
+    So `max_coverage` filters those out, leaving the promoter inside a cassette
+    and the origin inside a backbone: the things the part band cannot show.
+
+    Small features go too, and only the largest survive: at ring scale a 20 bp
+    binding site is a sliver that cannot be read, and eight per part is already
+    more than the annulus can hold.
+    """
+    if not span or not length or not part_length:
+        return []
+    start, _ = span
+    out: list[FeatureInfo] = []
+    seen: set[tuple[int, int]] = set()
+    for feature in features_within(features, span, length):
+        size = feature.end - feature.start
+        if size < min_length or size > part_length * max_coverage:
+            continue
+        if feature.type in _NOT_A_COMPONENT:
+            continue
+        # a label that names the tool rather than the thing is not a feature
+        label = clean_label(feature.label) if feature.label else ""
+        if not label or _LABEL_NOISE.search(label):
+            continue
+        # the same span annotated twice draws twice and looks like a heavier arc
+        if (feature.start, feature.end) in seen:
+            continue
+        seen.add((feature.start, feature.end))
+        at = offset + ((feature.start - start) % length)
+        # a feature drawn across the fragment's edge is clipped, not dropped
+        out.append(
+            replace(
+                feature,
+                label=label,
+                start=at,
+                end=min(at + size, offset + part_length),
+            )
+        )
+    out.sort(key=lambda f: f.start - f.end)  # largest first
+    out = out[:limit]
+
+    # A lone annotation covering most of its part is a restatement of that part,
+    # not structure within it - `ConS` across a 194 bp connector draws an arc
+    # the same size as the arc above it. Two or more annotations *are*
+    # structure, however big any one of them is, which is why `His3` inside a
+    # marker part and `ARS4` inside an origin part still draw.
+    if len(out) == 1 and (out[0].end - out[0].start) > part_length * 0.5:
+        return []
+    return sorted(out, key=lambda f: f.start)
+
+
 def summarise(features: list[FeatureInfo], deprioritise: str | None = None) -> str:
     """What a fragment holds, in the order a transcription unit is read.
 
@@ -906,6 +984,24 @@ TRIAGE_UNCUTTABLE = "uncuttable"
 TRIAGE_LINEAR = "linear"
 
 
+def level3_readiness(call: TypeCall, connector_overhang: str | None) -> bool | None:
+    """Whether a connector part can still take part in a multigene assembly.
+
+    A cassette is released from its plasmid by the multigene enzyme cutting
+    inside the type 1 and type 5 parts at its ends. Some parts in a real
+    library have had that site domesticated away - `L13_ConLS_BSMB1del` says so
+    in its own name, and its annotation reads "Former Bsmb1". A cassette built
+    from one assembles perfectly at Level 2 and then cannot be cut out at Level
+    3, and nothing says so until the multigene step fails to find its ends.
+
+    Only positions 1 and 5 are judged: no other part contributes to the ends,
+    so for them the question does not arise and the answer is `None`.
+    """
+    if _base_type(call.part_type) not in {"1", "5"}:
+        return None
+    return bool(connector_overhang)
+
+
 def triage(entry: PlasmidEntry) -> str:
     """Why this plasmid has no part type, as a key a filter can group on.
 
@@ -963,6 +1059,7 @@ def describe(
         scheme=scheme.name,
         roles=roles.roles,
         connector_overhang=roles.connector_overhang,
+        level3_ready=level3_readiness(call, roles.connector_overhang),
         cassette_overhangs=roles.cassette_overhangs,
         cassette_span=roles.cassette_span,
         ecoli_marker=_ecoli_marker(record),
@@ -1587,6 +1684,67 @@ class Library:
                 "entries": self._cache,
             },
         )
+
+    # -- the build log ----------------------------------------------------- #
+
+    @property
+    def builds_path(self) -> Path:
+        return self.cache_dir / BUILDS_FILE
+
+    def log_build(
+        self,
+        name: str,
+        level: str,
+        parts: Sequence[PlasmidEntry],
+        length: int,
+        issues: Sequence[str] = (),
+    ) -> dict[str, Any]:
+        """Record that a construct was exported, and exactly what went into it.
+
+        Append-only, one JSON object per line, because the question it answers
+        comes months later: *which* pYTK009 was in the thing I built in March,
+        and has that file changed since. So each part is logged with the
+        checksum of its sequence rather than only its name - a name is not
+        evidence, and a file on a shared drive can be edited under you.
+        """
+        import datetime
+
+        record = {
+            "at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+            "name": name,
+            "level": level,
+            "length": length,
+            "parts": [
+                {
+                    "name": e.name,
+                    "path": e.path,
+                    "part_type": e.call.part_type,
+                    "length": e.length,
+                    "sha1": e.checksum,
+                }
+                for e in parts
+            ],
+            "issues": list(issues),
+        }
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        with self.builds_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
+        return record
+
+    def builds(self, limit: int = 100) -> list[dict[str, Any]]:
+        """The most recent builds, newest first. A damaged line is skipped."""
+        if not self.builds_path.exists():
+            return []
+        out: list[dict[str, Any]] = []
+        for line in self.builds_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue  # a torn write should not hide the rest of the log
+        return list(reversed(out))[:limit]
 
     # -- saved designs ----------------------------------------------------- #
 

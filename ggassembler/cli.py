@@ -39,6 +39,17 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--composite-left", action="store_true", help="one 2\u00b73\u00b74 slot")
     build.add_argument("--composite-right", action="store_true", help="one 6\u00b77\u00b78 slot")
 
+    check = sub.add_parser(
+        "check",
+        help="fail if detection finds new conflicts or unrecognised files",
+    )
+    check.add_argument("folder", type=Path, nargs="+", help="library folder(s) to index")
+    check.add_argument("--baseline", type=Path, default=Path(".ggasm-baseline.json"),
+                       help="the committed baseline to compare against")
+    check.add_argument("--update", action="store_true",
+                       help="write the current state as the new baseline and exit 0")
+    check.add_argument("--no-recursive", dest="recursive", action="store_false")
+
     serve = sub.add_parser("serve", help="start the app and open it in a browser")
     serve.add_argument("folder", type=Path, nargs="+", help="library folder(s) to index")
     serve.add_argument("--port", type=int, default=8737)
@@ -50,6 +61,69 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    """Compare the library against a committed baseline; fail on anything new.
+
+    Meant for a pre-commit hook on the plasmid repository. It deliberately does
+    not fail on problems that were already there - a library of several hundred
+    files always has some - only on ones this commit introduces. That is the
+    difference between a hook people keep and a hook people disable.
+    """
+    library = Library(args.folder, recursive=args.recursive)
+    library.scan()
+    current = _check_state(library)
+
+    if args.update:
+        args.baseline.write_text(json.dumps(current, indent=2, sort_keys=True) + "\n",
+                                 encoding="utf-8")
+        print(f"baseline written to {args.baseline} "
+              f"({len(current['conflicts'])} conflicts, "
+              f"{len(current['unrecognised'])} unrecognised)")
+        return 0
+
+    if not args.baseline.exists():
+        print(f"no baseline at {args.baseline}. Run `ggasm check --update` once to "
+              f"record the current state, then commit it.", file=sys.stderr)
+        return 2
+
+    before = json.loads(args.baseline.read_text(encoding="utf-8"))
+    problems = 0
+    for kind, label in (("conflicts", "conflict"), ("unrecognised", "unrecognised")):
+        known = set(before.get(kind, {}))
+        for name in sorted(set(current[kind]) - known):
+            print(f"new {label}: {name}: {current[kind][name]}", file=sys.stderr)
+            problems += 1
+
+    fixed = sum(
+        len(set(before.get(kind, {})) - set(current[kind]))
+        for kind in ("conflicts", "unrecognised")
+    )
+    if problems:
+        print(f"\n{problems} new problem(s). Fix them, or re-baseline with "
+              f"`ggasm check --update`.", file=sys.stderr)
+        return 1
+
+    print(f"{current['total']} plasmids, nothing new"
+          + (f" ({fixed} fewer than the baseline)" if fixed else ""))
+    return 0
+
+
+def _check_state(library: Library) -> dict[str, object]:
+    """The facts a baseline records: what is broken, and what it is broken about."""
+    entries = library.unique_entries()
+    return {
+        "total": len(entries),
+        "conflicts": {
+            e.name: e.call.conflict for e in entries if e.call.conflict
+        },
+        "unrecognised": {
+            e.name: e.call.reason
+            for e in entries
+            if e.call.part_type is None and not e.is_assembled
+        },
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -57,6 +131,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_scan(args)
     if args.command == "build":
         return cmd_build(args)
+    if args.command == "check":
+        return cmd_check(args)
     if args.command == "serve":
         return cmd_serve(args)
     parser.print_help()

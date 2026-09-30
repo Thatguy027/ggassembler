@@ -54,7 +54,19 @@ def create_app(
         if router is not None:
             app.include_router(router)
 
-    app.mount("/static", StaticFiles(directory=WEB), name="static")
+    # Always revalidate. This is a local tool whose stylesheets and scripts
+    # change under a running browser, and a cached one is indistinguishable
+    # from a change that did not work: the page renders with new markup and
+    # old rules, which is how a flex diagram comes out stacked vertically.
+    # ETags make revalidation nearly free, so nothing is actually re-sent
+    # unless it changed.
+    class FreshStatic(StaticFiles):
+        def file_response(self, *args: object, **kwargs: object):  # type: ignore[override]
+            response = super().file_response(*args, **kwargs)
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            return response
+
+    app.mount("/static", FreshStatic(directory=WEB), name="static")
 
     for url, folder in SCREENS.items():
         app.get(url, include_in_schema=False)(_screen(folder))

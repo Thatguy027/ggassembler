@@ -287,15 +287,51 @@ function renderMap(result) {
     return;
   }
 
+  /* The construct, with each transcription unit opened up into the parts that
+   * built it. Drawn inside the bar rather than as a diagram above it: one
+   * element means there is no alignment to keep, and the whole thing scales
+   * with the page instead of a column of blocks drifting off its segment. */
+  const contents = new Map((result.units || []).map((u) => [u.name, u]));
+
   const bar = document.createElement('div');
   bar.className = 'map-bar';
   for (const part of result.parts) {
     const seg = document.createElement('div');
     seg.className = 'map-seg';
-    seg.style.background = part.color || 'var(--part-8)';
     seg.style.flexGrow = String(part.length);
-    seg.textContent = part.source_name;
-    seg.title = `${part.source_name} · ${part.length.toLocaleString()} bp · ${part.left_overhang}→${part.right_overhang}`;
+    seg.title = `${part.source_name} · ${part.length.toLocaleString()} bp · `
+      + `${part.left_overhang}→${part.right_overhang}`;
+
+    const unit = contents.get(part.source_name);
+    const inside = (unit && unit.parts) || [];
+
+    if (inside.length) {
+      const row = document.createElement('div');
+      row.className = 'map-parts';
+      for (const piece of inside) {
+        const block = document.createElement('div');
+        block.className = 'map-part';
+        if (!piece.known) block.classList.add('is-gap');
+        // proportional within the segment, so a gene reads as a gene and a
+        // terminator as a sliver - the same scale as the construct itself
+        block.style.flexGrow = String(Math.max(piece.length, 1));
+        block.style.background = piece.color;
+        block.textContent = piece.short || piece.component || piece.name || '';
+        block.title = `type ${piece.part_type} · `
+          + `${piece.component || piece.name || 'not in the library'} · `
+          + `${piece.length.toLocaleString()} bp`;
+        row.append(block);
+      }
+      seg.append(row);
+    } else {
+      seg.classList.add('is-plain');
+      seg.style.background = part.color || 'var(--part-8)';
+    }
+
+    const label = document.createElement('span');
+    label.className = 'map-seg-name';
+    label.textContent = part.source_name;
+    seg.append(label);
     bar.append(seg);
   }
 
@@ -749,3 +785,268 @@ el('save-btn').addEventListener('click', async () => {
 });
 
 load();
+
+// ---------------------------------------------------------------- protocol ---
+
+/* What to pipette for the multigene reaction.
+ *
+ * Every multigene vector is a dropout whose enzyme sites leave with the
+ * fragment being replaced, so this reaction always takes the short programme:
+ * cycling, then hold. No final digest, no heat inactivation, and the colony
+ * colour cannot be trusted on its own - which the server says in its notes.
+ */
+
+let protocolText = '';
+
+function rxRow(component) {
+  const tr = document.createElement('tr');
+  if (component.kind === 'reagent' || component.kind === 'water') {
+    tr.classList.add('is-reagent');
+  }
+  if (!component.measured && component.kind !== 'reagent' && component.kind !== 'water') {
+    tr.classList.add('is-missing');
+  }
+  const cells = [
+    [component.name, ''],
+    [component.volume_ul === null ? '' : component.volume_ul.toFixed(2), 'num'],
+    [component.ng === null ? '' : component.ng.toFixed(1), 'num'],
+    [component.length ? component.length.toLocaleString() : '', 'num'],
+    [component.note, 'rx-note'],
+  ];
+  for (const [text, cls] of cells) {
+    const td = document.createElement('td');
+    if (cls) td.className = cls;
+    td.textContent = text;
+    tr.append(td);
+  }
+  return tr;
+}
+
+function renderProtocol(rx) {
+  const body = el('protocol-body');
+  body.replaceChildren();
+
+  for (const [kind, messages] of [['rx-warn', rx.issues || []],
+                                  ['rx-lead', rx.notes || []]]) {
+    for (const message of messages) {
+      const box = document.createElement('div');
+      box.className = kind;
+      box.textContent = message;
+      body.append(box);
+    }
+  }
+
+  const table = document.createElement('table');
+  table.className = 'rx-table';
+  const head = document.createElement('tr');
+  for (const [label, cls] of [['Component', ''], ['µL', 'num'], ['ng', 'num'],
+                              ['bp', 'num'], ['', '']]) {
+    const th = document.createElement('th');
+    th.textContent = label;
+    if (cls) th.className = cls;
+    head.append(th);
+  }
+  table.append(head, ...rx.components.map(rxRow));
+  body.append(table);
+
+  const steps = document.createElement('ul');
+  steps.className = 'rx-steps';
+  for (const step of rx.steps) {
+    const li = document.createElement('li');
+    const b = document.createElement('b');
+    b.textContent = step.label;
+    const detail = document.createElement('span');
+    detail.textContent = step.detail;
+    li.append(b, detail);
+    steps.append(li);
+  }
+  body.append(steps);
+}
+
+function wireProtocol() {
+  el('protocol-btn').addEventListener('click', async () => {
+    const rx = await post('/api/level3/protocol', state);
+    protocolText = rx.text || '';
+    renderProtocol(rx);
+    el('protocol-title').textContent = `${rx.name} · ${rx.enzyme} reaction`;
+    el('protocol-dialog').showModal();
+  });
+  el('protocol-copy').addEventListener('click', async () => {
+    if (!protocolText) return;
+    await navigator.clipboard.writeText(protocolText);
+    const button = el('protocol-copy');
+    button.textContent = 'Copied';
+    setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+  });
+}
+
+wireProtocol();
+
+// ----------------------------------------------------------------- design ---
+
+/* The design direction.
+ *
+ * Every other screen starts from parts you already have. A project starts from
+ * the other end: *I want these genes expressed, in this order*. So this takes
+ * promoter-CDS-terminator per unit and works backwards to the eight-part
+ * plasmids that have to exist first, assigning the connectors so the cassettes
+ * chain - which is the fiddly part, and the part worth automating.
+ */
+
+let designRows = [];
+let designed = null;
+
+function partOptions(select, entries, chosen) {
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = '—';
+  select.append(blank);
+  for (const entry of entries) {
+    const option = document.createElement('option');
+    option.value = entry.name;
+    option.textContent = entry.display || entry.name;
+    if (entry.name === chosen) option.selected = true;
+    select.append(option);
+  }
+}
+
+function designRow(row, index) {
+  const wrap = document.createElement('div');
+  wrap.className = 'design-unit';
+
+  const head = document.createElement('div');
+  head.className = 'design-unit-head';
+  const label = document.createElement('span');
+  label.className = 'lbl';
+  label.textContent = `Unit ${index + 1}`;
+  const nameInput = document.createElement('input');
+  nameInput.className = 'design-unit-name';
+  nameInput.placeholder = 'name (optional)';
+  nameInput.value = row.name || '';
+  nameInput.addEventListener('input', () => { row.name = nameInput.value; });
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'btn';
+  remove.textContent = 'Remove';
+  remove.addEventListener('click', () => {
+    designRows.splice(index, 1);
+    renderDesignUnits();
+  });
+  head.append(label, nameInput, remove);
+  wrap.append(head);
+
+  const grid = document.createElement('div');
+  grid.className = 'design-grid';
+  for (const [slot, field, caption] of [
+    ['2', 'promoter', 'Promoter'],
+    ['3', 'cds', 'Coding sequence'],
+    ['4', 'terminator', 'Terminator'],
+  ]) {
+    const cell = document.createElement('label');
+    cell.className = 'design-cell';
+    const text = document.createElement('span');
+    text.className = 'lbl';
+    text.textContent = caption;
+    const select = document.createElement('select');
+    partOptions(select, designParts[slot] || [], row[field]);
+    select.addEventListener('change', () => { row[field] = select.value; });
+    cell.append(text, select);
+    grid.append(cell);
+  }
+  wrap.append(grid);
+  return wrap;
+}
+
+let designParts = {};
+
+function renderDesignUnits() {
+  const host = el('design-units');
+  host.replaceChildren(...designRows.map(designRow));
+}
+
+function renderDesignReport(result) {
+  designed = result;
+  const host = el('design-report');
+  host.replaceChildren();
+
+  for (const issue of result.issues || []) {
+    const box = document.createElement('div');
+    box.className = issue.level === 'error' ? 'rx-warn' : 'rx-lead';
+    box.textContent = issue.message;
+    host.append(box);
+  }
+
+  const pre = document.createElement('pre');
+  pre.className = 'design-report';
+  pre.textContent = result.report;
+  host.append(pre);
+  el('design-write').disabled = !result.ok;
+}
+
+function designBody() {
+  return {
+    name: el('design-title').value.trim() || 'pPathway',
+    units: designRows,
+    backbone: el('design-backbone').value || null,
+  };
+}
+
+function wireDesign() {
+  el('design-btn').addEventListener('click', async () => {
+    if (!Object.keys(designParts).length) {
+      const rows = await (await fetch('/api/library/plasmids')).json();
+      for (const slot of ['2', '3', '4']) {
+        designParts[slot] = rows
+          .filter((r) => r.part_type === slot)
+          .sort((a, b) => (a.display || a.name).localeCompare(b.display || b.name));
+      }
+    }
+    const picker = el('design-backbone');
+    if (picker.options.length <= 1) {
+      for (const vector of catalogue.backbones) {
+        const option = document.createElement('option');
+        option.value = vector.name;
+        option.textContent =
+          `${vector.name} · ${vector.left_overhang}→${vector.right_overhang}`;
+        picker.append(option);
+      }
+    }
+    if (!designRows.length) designRows = [{}, {}];
+    renderDesignUnits();
+    el('design-report').replaceChildren();
+    el('design-write').disabled = true;
+    el('design-dialog').showModal();
+  });
+
+  el('design-add').addEventListener('click', () => {
+    designRows.push({});
+    renderDesignUnits();
+  });
+
+  el('design-run').addEventListener('click', async () => {
+    const button = el('design-run');
+    button.disabled = true;
+    try {
+      renderDesignReport(await post('/api/level3/design', designBody()));
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  el('design-write').addEventListener('click', async () => {
+    const response = await fetch('/api/level3/design.zip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(designBody()),
+    });
+    if (!response.ok) return;
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${designBody().name}-design.zip`;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+wireDesign();

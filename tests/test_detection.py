@@ -617,3 +617,67 @@ def test_a_hand_chosen_canonical_still_beats_a_verified_name(tmp_path):
     library.scan()
     library.set_canonical("thing.gb")
     assert library.unique_entries()[0].name == "thing"
+
+
+# --------------------------------------------------------------------------- #
+# readiness for the level above
+# --------------------------------------------------------------------------- #
+
+
+def test_a_connector_that_kept_its_multigene_site_is_level3_ready(tmp_path):
+    from ggassembler.core.enzymes import BSMBI
+
+    insert = (
+        synth.filler(40, 11) + synth.forward_site(BSMBI) + "CCAA" + synth.filler(40, 12)
+    )
+    record = synth.part_plasmid("1", insert=insert, name="ConLS")
+    write_genbank(record, tmp_path / "ConLS.gb")
+    library = Library(tmp_path)
+    library.scan()
+    entry = library.get("ConLS")
+    assert entry.connector_overhang, "this fixture should carry a connector"
+    assert entry.level3_ready is True
+
+
+def test_a_connector_with_no_multigene_site_blocks_the_level_above(tmp_path):
+    """`L13_ConLS_BSMB1del` is the real case: its own label reads "Former Bsmb1".
+
+    It assembles at Level 2 like any other type 1 part and produces a cassette
+    that cannot be cut out of its plasmid, which nothing surfaced until the
+    multigene step failed to find the ends.
+    """
+    from ggassembler.core.enzymes import BSMBI, find_sites
+
+    record = synth.part_plasmid("1", insert=synth.filler(120, 42), name="ConLS_del")
+    assert not find_sites(str(record.seq), BSMBI), "fixture must have no BsmBI site"
+    write_genbank(record, tmp_path / "ConLS_del.gb")
+
+    library = Library(tmp_path)
+    library.scan()
+    entry = library.get("ConLS_del")
+    assert entry.call.part_type == "1"
+    assert entry.connector_overhang is None
+    assert entry.level3_ready is False
+
+
+def test_the_question_does_not_arise_for_other_positions(tmp_path):
+    """Only positions 1 and 5 contribute to a cassette's ends, so only they can
+    block the level above. A promoter is neither ready nor blocking."""
+    for part_type, name in (("2", "promoter"), ("3", "cds"), ("6", "marker")):
+        write_genbank(synth.part_plasmid(part_type, name=name), tmp_path / f"{name}.gb")
+    library = Library(tmp_path)
+    library.scan()
+    for name in ("promoter", "cds", "marker"):
+        assert library.get(name).level3_ready is None
+
+
+def test_readiness_survives_the_cache(tmp_path):
+    write_genbank(synth.part_plasmid("5", name="ConR1"), tmp_path / "ConR1.gb")
+    first = Library(tmp_path)
+    first.scan()
+    expected = first.get("ConR1").level3_ready
+    assert expected is not None
+
+    second = Library(tmp_path)
+    second.scan()  # reads the index written above rather than re-digesting
+    assert second.get("ConR1").level3_ready == expected

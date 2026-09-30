@@ -93,14 +93,29 @@ def test_every_piece_of_dna_gets_the_same_number_of_moles():
     assert {c.fmol for c in dna} == {protocol.DEFAULT_FMOL}
 
 
-def test_a_piece_with_no_concentration_has_no_volume_invented_for_it():
+def test_an_unmeasured_prep_is_costed_at_the_default_and_flagged():
+    """A pipettable volume either way, but never passed off as a measurement."""
     reaction = rx(parts=[("promoter", 700, 100.0), ("cds", 2400, None)])
-    missing = [c for c in reaction.components if c.name == "cds"][0]
-    assert missing.volume_ul is None
-    assert missing.ng is not None, "the mass is still known - only the volume is not"
-    assert not reaction.ok
+    guessed = [c for c in reaction.components if c.name == "cds"][0]
+
+    assert guessed.conc_ng_ul == protocol.ASSUMED_CONC
+    assert guessed.volume_ul == pytest.approx(guessed.ng / protocol.ASSUMED_CONC, abs=0.01)
+    assert not guessed.measured
+    assert "assuming" in guessed.note
+
+    # the reaction still works - this is a note about it, not a fault in it
+    assert reaction.ok
     assert reaction.missing == ["cds"]
-    assert "no recorded concentration" in reaction.issues[0]
+    assert any("no measured concentration" in note for note in reaction.notes)
+
+
+def test_a_measured_prep_is_not_flagged():
+    reaction = rx()
+    for component in reaction.components:
+        if component.kind in ("part", "destination"):
+            assert component.measured
+    assert reaction.missing == []
+    assert reaction.notes == []
 
 
 def test_the_reagents_are_there_and_scale_with_the_reaction():
@@ -166,10 +181,10 @@ def test_the_text_version_carries_every_component_and_step():
         assert step.label in text
 
 
-def test_the_text_version_says_what_is_missing():
+def test_the_text_version_says_what_was_assumed():
     text = protocol.as_text(rx(parts=[("cds", 2400, None)]))
-    assert "?" in text
-    assert "Before you set this up" in text
+    assert "Worth knowing" in text
+    assert "no measured concentration" in text
 
 
 # --------------------------------------------------------------------------- #
@@ -222,3 +237,44 @@ def test_a_negative_concentration_is_refused(library):
 
 def test_an_unmeasured_plasmid_simply_has_none(library):
     assert library.get("promoter").conc_ng_ul is None
+
+
+# --------------------------------------------------------------------------- #
+# a dropout whose sites leave with the fragment
+# --------------------------------------------------------------------------- #
+
+
+def test_a_reversed_site_dropout_ends_the_programme_after_cycling():
+    """No final digest, no heat inactivation - counter-selection instead."""
+    labels = [s.label for s in protocol.cycling(BSAI, reversed_dropout=True)]
+    assert labels == ["30× cycle", "Hold"]
+
+    normal = [s.label for s in protocol.cycling(BSAI)]
+    assert "Final digest" in normal and "Inactivate" in normal
+
+
+def test_the_reaction_says_why_the_programme_is_short():
+    reaction = rx(reversed_dropout=True)
+    assert reaction.reversed_dropout
+    note = " ".join(reaction.notes)
+    assert "no final digest" in note
+    assert "chloramphenicol" in note
+    assert "misassembly" in note
+
+
+def test_a_site_free_reaction_says_none_of_that():
+    reaction = rx()
+    assert not reaction.reversed_dropout
+    assert not any("chloramphenicol" in note for note in reaction.notes)
+
+
+def test_the_note_reaches_the_written_protocol():
+    text = protocol.as_text(rx(reversed_dropout=True))
+    assert "chloramphenicol" in text
+    assert "Final digest" not in text
+
+
+def test_thirty_cycles():
+    """The lab runs 30; the paper's 25 was the wrong default to have taken."""
+    assert protocol.CYCLES == 30
+    assert protocol.cycling(BSAI)[0].label.startswith("30")

@@ -64,6 +64,7 @@ def compact(entry: PlasmidEntry, scheme_name: str = "YTK") -> dict[str, Any]:
         "reversed_sites": entry.call.reversed_sites,
         "roles": entry.roles,
         "connector_overhang": entry.connector_overhang,
+        "level3_ready": entry.level3_ready,
         "cassette_overhangs": list(entry.cassette_overhangs) if entry.cassette_overhangs else None,
         "multigene_overhangs": entry.multigene_overhangs,
         "internal_multigene_positions": entry.internal_multigene_positions,
@@ -298,6 +299,12 @@ def save_design(request: Request, body: DesignRecord) -> dict[str, Any]:
 @router.delete("/designs")
 def delete_design(request: Request, level: str, name: str) -> dict[str, Any]:
     return {"deleted": get_library(request).delete_design(level, name)}
+
+
+@router.get("/builds")
+def builds(request: Request, limit: int = 100) -> list[dict[str, Any]]:
+    """What has been exported, newest first, with each part's checksum."""
+    return get_library(request).builds(limit)
 
 
 @router.post("/rescan")

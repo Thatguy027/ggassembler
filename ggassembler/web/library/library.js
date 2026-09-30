@@ -298,6 +298,9 @@ function visible() {
     if (state.confidence === 'described-by-name'
         && row.component_source !== 'filename') return false;
     if (state.confidence === 'undescribed' && row.component) return false;
+    // type 1 and 5 parts that lost their multigene site: they assemble at
+    // Level 2 and make a cassette with no ends
+    if (state.confidence === 'blocks-multigene' && row.level3_ready !== false) return false;
     // triage: why a plasmid has no type. Each is a different job to fix.
     if (TRIAGE_FILTERS.includes(state.confidence)
         && row.triage !== state.confidence) return false;
@@ -306,7 +309,8 @@ function visible() {
     if (
       state.confidence &&
       !['manual', 'attention', 'internal-multigene', 'described-by-name',
-        'undescribed', 'assumed-circular', 'merged', ...TRIAGE_FILTERS]
+        'undescribed', 'assumed-circular', 'merged', 'blocks-multigene',
+        ...TRIAGE_FILTERS]
         .includes(state.confidence) &&
       row.confidence !== state.confidence
     ) return false;

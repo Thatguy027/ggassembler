@@ -12,8 +12,10 @@ This module owns no enzyme knowledge of its own and imports no other level.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from typing import Sequence
 
+from ..core import decompose as decompose_core
 from ..core import parttypes
 from ..core.assembly import ERROR, INFO, WARNING, AssemblyResult, Issue, Piece, assemble
 from ..core import seqio
@@ -231,6 +233,7 @@ def _notes(design: CassetteDesign, chosen: list[PlasmidEntry]) -> list[Issue]:
         )
 
     notes += _connector_notes(chosen)
+    notes += _multigene_notes(chosen)
 
     # Only the part covering position 8 contributes an E. coli marker to the
     # product; the others leave theirs behind on their own part plasmids, so
@@ -248,6 +251,30 @@ def _notes(design: CassetteDesign, chosen: list[PlasmidEntry]) -> list[Issue]:
         )
 
     return notes
+
+
+def _multigene_notes(chosen: list[PlasmidEntry]) -> list[Issue]:
+    """Warn when the cassette could never be cut out for a multigene assembly.
+
+    The multigene enzyme releases a cassette by cutting inside the type 1 and
+    type 5 parts at its ends. A part that has had that site domesticated away
+    still assembles perfectly here - nothing at this level touches it - so this
+    is the only moment to say so, before the plasmid is built and the failure
+    turns up two steps later as a cassette with no ends.
+    """
+    blocked = [e for e in chosen if e.level3_ready is False]
+    if not blocked:
+        return []
+    names = ", ".join(f"{e.name} (type {e.call.part_type})" for e in blocked)
+    return [
+        Issue(
+            WARNING,
+            "blocks_multigene",
+            f"{names} carries no site for the multigene enzyme, so this cassette "
+            f"assembles but can never be cut out of its plasmid for a Level 3 "
+            f"assembly. Fine if this is the final construct.",
+        )
+    ]
 
 
 def _connector_notes(chosen: list[PlasmidEntry]) -> list[Issue]:
@@ -300,22 +327,17 @@ def validation_strip(result: AssemblyResult) -> list[dict[str, str]]:
 # --------------------------------------------------------------------------- #
 
 
-@dataclass
-class Match:
-    """One library part found inside an assembled cassette."""
-
-    name: str
-    display: str
-    part_type: str
-    start: int
-    end: int
-    length: int
-    component: str = ""
+#: Reading a construct back into parts is a core capability, not a Level 2 one -
+#: Level 3 asks the same question of each transcription unit. The tiling lives
+#: there; what stays here is the only part that *is* Level 2's: turning those
+#: matches into panel choices and the view flags those panels need.
+Match = decompose_core.Match
+Unmatched = decompose_core.Unmatched
 
 
 @dataclass
 class Decomposition:
-    """What a finished cassette is made of, as far as the library can tell."""
+    """A tiling, expressed as something the Level 2 screen can load."""
 
     cassette: str
     length: int
@@ -326,8 +348,13 @@ class Decomposition:
     split_8: bool = False
     composite_left: bool = False
     composite_right: bool = False
-    gaps: list[tuple[int, int]] = field(default_factory=list)
-    """Stretches no library part explains, as (start, length)."""
+    unmatched: list[Unmatched] = field(default_factory=list)
+    """Stretches no library part explains, with the ends they sit between."""
+
+    @property
+    def gaps(self) -> list[tuple[int, int]]:
+        """The same stretches as ``(start, length)``, for callers that only count."""
+        return [(u.start, u.length) for u in self.unmatched]
 
     @property
     def covered(self) -> int:
@@ -335,7 +362,7 @@ class Decomposition:
 
     @property
     def complete(self) -> bool:
-        return bool(self.matches) and not self.gaps
+        return bool(self.matches) and not self.unmatched
 
     def to_design(self, name: str) -> CassetteDesign:
         return CassetteDesign(
@@ -350,115 +377,22 @@ class Decomposition:
 
 
 def decompose(library: Library, cassette: PlasmidEntry) -> Decomposition:
-    """Read an assembled cassette back into the library parts that built it.
+    """Read an assembled cassette back into the parts that built it.
 
-    The assembly consumed every BsaI site, so this cannot be a digest: the
-    parts are gone as *sites* but still present as *sequence*. So each part's
-    released fragment is looked for in the cassette directly, and the ones that
-    abut end-to-end are chained into a tiling of the plasmid.
-
-    Where the chain covers the whole circle the panels can be filled exactly.
-    Where it does not, the gaps come back as gaps rather than being papered
-    over - a part swapped in from outside the library is a real answer, and
-    guessing at it would be worse than saying so.
+    The screen's other direction: instead of picking eight parts, pick a
+    construct you already have and get its panels filled in, ready to swap one.
     """
-    out = Decomposition(cassette=cassette.name, length=cassette.length)
-    sequence = seqio.sequence(library.record(cassette)).upper()
-    if not sequence:
-        return out
-
-    # search the doubled sequence so a part spanning the origin is still found
-    doubled = sequence + sequence
-    n = len(sequence)
-
-    starts: dict[int, list[tuple[PlasmidEntry, int]]] = {}
-    for entry, fragment in library.part_fragments():
-        if len(fragment) > n:
-            continue
-        at = doubled.find(fragment)
-        while at != -1 and at < n:
-            starts.setdefault(at, []).append((entry, (at + len(fragment)) % n))
-            at = doubled.find(fragment, at + 1)
-
-    if not starts:
-        out.gaps = [(0, n)]
-        return out
-
-    chain = _tile(starts, n)
-    if not chain:
-        out.gaps = [(0, n)]
-        return out
-
-    for entry, start, end in chain:
-        out.matches.append(
-            Match(
-                name=entry.name,
-                display=entry.display,
-                part_type=entry.call.part_type or "",
-                start=start,
-                end=end,
-                length=(end - start) % n or n,
-                component=entry.component,
-            )
-        )
-
-    out.gaps = _gaps(chain, n)
+    tiling = decompose_core.tile(library, cassette)
+    out = Decomposition(
+        cassette=cassette.name,
+        length=tiling.length,
+        matches=list(tiling.matches),
+        unmatched=list(tiling.unmatched),
+    )
     _fill_selections(out)
     return out
 
 
-def _tile(
-    starts: dict[int, list[tuple[PlasmidEntry, int]]], n: int
-) -> list[tuple[PlasmidEntry, int, int]]:
-    """The longest run of parts that abut end-to-end, closing the circle if it can.
-
-    Tried from every match in turn, preferring atomic parts over composites so
-    the panels come back as granular as the library allows: a 2-3-4 dropout and
-    three separate parts can describe the same stretch, and three panels are
-    more use than one.
-    """
-    def rank(pair: tuple[PlasmidEntry, int]) -> tuple:
-        entry, _ = pair
-        atoms = len(parttypes.positions(entry.call.part_type or "", YTK))
-        return (atoms, entry.name)
-
-    best: list[tuple[PlasmidEntry, int, int]] = []
-    for origin in sorted(starts):
-        used: set[str] = set()
-        chain: list[tuple[PlasmidEntry, int, int]] = []
-        at = origin
-        while True:
-            candidates = [c for c in sorted(starts.get(at, []), key=rank)
-                          if c[0].name not in used]
-            if not candidates:
-                break
-            entry, end = candidates[0]
-            used.add(entry.name)
-            chain.append((entry, at, end))
-            at = end
-            if at == origin:
-                break  # the circle closed
-        covered = sum((e - s) % n or n for _, s, e in chain)
-        if covered > sum((e - s) % n or n for _, s, e in best):
-            best = chain
-        if covered == n:
-            break
-    return best
-
-
-def _gaps(chain: list[tuple[PlasmidEntry, int, int]], n: int) -> list[tuple[int, int]]:
-    """The stretches the chain leaves unexplained."""
-    if not chain:
-        return [(0, n)]
-    covered = sum((e - s) % n or n for _, s, e in chain)
-    if covered >= n:
-        return []
-    # the chain is contiguous, so there is exactly one gap: end of last to start
-    return [(chain[-1][2], (chain[0][1] - chain[-1][2]) % n)]
-
-
-#: A composite key and the atomic keys it replaces on screen. Only one of the
-#: two can be shown at once, so only one may be selected.
 _SUPERSEDES = {
     "3": ("3a", "3b"),
     "4": ("4a", "4b"),
@@ -490,3 +424,121 @@ def _fill_selections(out: Decomposition) -> None:
     out.split_8 = bool(keys & {"8a", "8b"})
     out.composite_left = "234" in keys
     out.composite_right = "678" in keys
+
+
+# --------------------------------------------------------------------------- #
+# swapping one position across many candidates
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class SweepRow:
+    """One candidate tried in one slot of an otherwise fixed design."""
+
+    name: str
+    display: str
+    part_type: str | None
+    part_length: int
+    ok: bool
+    length: int = 0
+    issues: list[Issue] = field(default_factory=list)
+    component: str = ""
+
+    @property
+    def errors(self) -> list[Issue]:
+        return [i for i in self.issues if i.level == ERROR]
+
+    @property
+    def warnings(self) -> list[Issue]:
+        return [i for i in self.issues if i.level == WARNING]
+
+
+def sweep(
+    library: Library,
+    design: CassetteDesign,
+    slot: str,
+    candidates: Sequence[str],
+) -> list[SweepRow]:
+    """Build the same design once per candidate in one position.
+
+    A promoter titration against a fixed coding sequence is the standard form
+    of this: forty-seven type 2 parts, one construct each, everything else held
+    still. Doing it by hand means forty-seven passes through the same screen,
+    and the interesting part - which of them assemble cleanly and how long each
+    comes out - is the same two facts every time.
+
+    Every candidate is reported, including the ones that fail: a promoter that
+    carries an internal site is a result, not an omission.
+    """
+    rows: list[SweepRow] = []
+    for name in candidates:
+        entry = library.get(name)
+        if entry is None:
+            rows.append(SweepRow(
+                name=name, display=name, part_type=None, part_length=0, ok=False,
+                issues=[Issue(ERROR, "unknown_part", f"no plasmid named {name}")],
+            ))
+            continue
+
+        trial = replace(design, selections={**design.selections, slot: entry.name})
+        result = build(library, trial)
+        rows.append(SweepRow(
+            name=entry.name,
+            display=entry.display,
+            part_type=entry.call.part_type,
+            part_length=entry.length,
+            ok=result.ok,
+            length=result.length,
+            issues=list(result.issues),
+            component=entry.component,
+        ))
+    return rows
+
+
+def sweep_products(
+    library: Library,
+    design: CassetteDesign,
+    slot: str,
+    candidates: Sequence[str],
+    name_template: str = "{design}_{part}",
+):
+    """The same sweep, yielding ``(filename, record)`` for the ones that built.
+
+    Kept apart from `sweep` because assembling the records is the expensive
+    half and the screen only needs the table until someone asks to write.
+    """
+    for name in candidates:
+        entry = library.get(name)
+        if entry is None:
+            continue
+        trial = replace(design, selections={**design.selections, slot: entry.name})
+        trial.name = name_template.format(design=design.name, part=entry.name)
+        result = build(library, trial)
+        if result.product is not None:
+            yield f"{trial.name}.gb", result.product
+
+
+def picklist(rows: list[SweepRow], design: CassetteDesign, slot: str) -> str:
+    """The sweep as a tab-separated sheet, for a notebook or a plate map."""
+    fixed = ", ".join(
+        f"{key}={value}" for key, value in sorted(design.selections.items()) if key != slot
+    )
+    lines = [
+        f"# {design.name}: position {slot} swept across {len(rows)} candidates",
+        f"# held fixed: {fixed}" if fixed else "# nothing else selected",
+        "",
+        "\t".join(["part", "component", "part_bp", "construct_bp", "assembles",
+                   "errors", "warnings", "notes"]),
+    ]
+    for row in rows:
+        lines.append("\t".join([
+            row.name,
+            row.component,
+            str(row.part_length),
+            str(row.length) if row.ok else "",
+            "yes" if row.ok else "no",
+            str(len(row.errors)),
+            str(len(row.warnings)),
+            "; ".join(i.message for i in row.issues if i.level != INFO),
+        ]))
+    return "\n".join(lines) + "\n"

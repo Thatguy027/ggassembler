@@ -75,12 +75,20 @@
           </select>
           <button class="btn" type="button" id="save-btn">Save</button>
           <button class="btn" type="button" id="clone-btn">Start from a cassette&hellip;</button>
+          <button class="btn" type="button" id="sweep-btn">Sweep a position&hellip;</button>
           <button class="btn" type="button" id="protocol-btn" disabled>Protocol</button>
           <button class="btn btn-primary" type="button" id="export-btn" disabled>Export .gbk</button>
         </div>
 
+        <div class="map-tools">
+          <button class="seg" type="button" id="toggle-features" aria-pressed="true">Direction</button>
+          <button class="seg" type="button" id="toggle-linear" aria-pressed="true">Linear view</button>
+        </div>
+
         <div class="map" id="map">
           <div class="ring" id="ring" role="img" aria-label="Assembled construct map"></div>
+          <svg class="map-layer" id="map-layer" viewBox="0 0 680 500" aria-hidden="true"></svg>
+          <div class="callouts" id="callouts"></div>
           <div class="ring-hub">
             <span class="ring-bp" id="ring-bp">&mdash;</span>
             <span class="card-note" id="ring-sub">nothing assembled yet</span>
@@ -88,9 +96,7 @@
           </div>
         </div>
 
-        <div class="expression" id="expression"></div>
-
-        <div class="legend" id="legend"></div>
+        <div class="linear" id="linear"></div>
 
         <div class="junctions">
           <span class="section-label">Junction overhangs</span>
@@ -141,6 +147,33 @@
       <input id="clone-filter" class="finder-input" type="search" autocomplete="off"
              spellcheck="false" placeholder="Search cassettes by name or contents…">
       <div class="clone-list" id="clone-list"></div>
+    </div>
+  </dialog>
+
+  <dialog id="sweep-dialog" class="sheet">
+    <form method="dialog" class="sheet-head">
+      <span class="sheet-title">Sweep a position</span>
+      <span style="flex-grow: 1"></span>
+      <button class="btn" type="button" id="sweep-run">Build all</button>
+      <button class="btn btn-primary" type="button" id="sweep-write" disabled>Write all</button>
+      <button class="btn" value="close">Close</button>
+    </form>
+    <div class="sheet-body">
+      <p class="rx-lead">
+        Hold the design still and vary one part. Every candidate is built and
+        reported, including the ones that fail &mdash; a promoter with an internal
+        site is a result, not an omission.
+      </p>
+      <div class="sweep-controls">
+        <label class="lbl" for="sweep-slot">Position</label>
+        <select id="sweep-slot"></select>
+        <span class="card-note" id="sweep-count">&nbsp;</span>
+        <span style="flex-grow: 1"></span>
+        <button class="btn" type="button" id="sweep-all">Select all</button>
+        <button class="btn" type="button" id="sweep-none">Select none</button>
+      </div>
+      <div class="sweep-candidates" id="sweep-candidates"></div>
+      <div id="sweep-results"></div>
     </div>
   </dialog>
 

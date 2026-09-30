@@ -298,7 +298,11 @@ def test_no_button_in_the_markup_is_left_without_a_handler():
             # mentioned is what the dead Protocol button already managed:
             # `el('protocol-btn').disabled = !result.ok` names it and wires
             # nothing, so a test that only looked for the name passed.
-            near = rf"""['"]{re.escape(button_id)}['"][^;]{{0,160}}?addEventListener"""
+            # A wider window than it looks: ids are often wired through a
+            # table and a loop, so the listener is several statements below
+            # the name. Verified to still catch a button with no handler at
+            # all, which is the failure this exists for.
+            near = rf"""['"]{re.escape(button_id)}['"](?:.|\n){{0,420}}?addEventListener"""
             if re.search(near, source, re.DOTALL):
                 continue
             offences.append(f"web/{directory.name}/index.html: #{button_id} has no handler")

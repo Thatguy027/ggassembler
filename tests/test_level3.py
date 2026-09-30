@@ -473,3 +473,532 @@ def test_a_library_with_no_cassettes_still_returns_a_design(tmp_path):
     empty.scan()
     design = level3.default_design(empty)
     assert design.transcription_units == [] and design.backbone is None
+
+
+# --------------------------------------------------------------------------- #
+# the reaction
+# --------------------------------------------------------------------------- #
+
+
+def test_the_multigene_reaction_takes_the_short_programme(client):
+    """Every multigene vector is a dropout whose sites leave with the fragment,
+    so this is the reaction the short programme exists for.
+
+    It is also the only place in the app where such a plasmid can be in the
+    tube: a reversed-site plasmid is not a part, so no Level 2 slot offers one.
+    """
+    seed = client.get("/api/level3/default").json()
+    body = {
+        "backbone": seed["backbone"],
+        "transcription_units": seed["transcription_units"],
+        "name": "pMultigene",
+    }
+    rx = client.post("/api/level3/protocol", json=body).json()
+
+    assert rx["reversed_dropout"]
+    assert [s["label"] for s in rx["steps"]] == ["30× cycle", "Hold"]
+    assert any("chloramphenicol" in note for note in rx["notes"])
+    assert rx["enzyme"] == "BsmBI"
+
+
+def test_the_multigene_reaction_costs_every_piece(client):
+    seed = client.get("/api/level3/default").json()
+    rx = client.post("/api/level3/protocol", json={
+        "backbone": seed["backbone"],
+        "transcription_units": seed["transcription_units"],
+        "name": "pMultigene",
+    }).json()
+    dna = [c for c in rx["components"] if c["kind"] in ("part", "destination")]
+    assert len(dna) == len(seed["transcription_units"]) + 1
+    for component in dna:
+        assert component["volume_ul"] is not None
+        assert component["path"]
+
+
+def test_the_multigene_protocol_downloads_as_text(client):
+    seed = client.get("/api/level3/default").json()
+    response = client.post("/api/level3/protocol.txt", json={
+        "backbone": seed["backbone"],
+        "transcription_units": seed["transcription_units"],
+        "name": "pMultigene",
+    })
+    assert response.status_code == 200
+    assert "Thermocycler" in response.text
+    assert "Final digest" not in response.text
+
+
+# --------------------------------------------------------------------------- #
+# what goes into each transcription unit
+# --------------------------------------------------------------------------- #
+
+
+def test_a_unit_reports_the_parts_that_built_it(library):
+    """Level 3 shows a chain of cassettes, which hides the thing you check:
+    that this promoter is driving that gene. The parts are still in the
+    cassette as sequence, so they can be read back out."""
+    design = level3.default_design(library)
+    entry = library.get(design.transcription_units[0])
+    parts = level3.unit_contents(library, entry)
+    for part in parts:
+        assert part["part_type"] in level3.UNIT_POSITIONS
+        for key in ("name", "display", "part_type", "length", "start", "color", "known"):
+            assert key in part
+
+
+def test_only_the_transcription_unit_positions_are_reported(library):
+    """Connectors join units together and 6-8 are the plasmid's own machinery.
+    Neither is what the unit expresses, so neither belongs in this diagram."""
+    for entry in library.cassettes():
+        for part in level3.unit_contents(library, entry):
+            assert part["part_type"] not in ("1", "5", "6", "7", "8", "8a", "8b")
+
+
+def test_the_parts_come_back_in_reading_order(library):
+    for entry in library.cassettes():
+        parts = level3.unit_contents(library, entry)
+        assert [p["start"] for p in parts] == sorted(p["start"] for p in parts)
+
+
+def test_a_part_not_in_the_library_is_drawn_as_a_gap(tmp_path):
+    """A gap in a diagram of a construct is a fact about the construct.
+
+    Built from real parts so the tiling has something to find: a synthetic
+    cassette contains no library parts at all, which would make this pass
+    without exercising anything.
+    """
+    from ggassembler.levels import level2_cassette as level2
+
+    from .test_assembly import CANONICAL
+
+    for part_type, name in CANONICAL.items():
+        write_genbank(
+            synth.part_plasmid(part_type, name=name, seed=synth.seed_for(name)),
+            tmp_path / f"{name}.gb",
+        )
+    lib = Library(tmp_path)
+    lib.scan()
+    built = level2.build(lib, level2.CassetteDesign(selections=dict(CANONICAL)))
+    assert built.ok
+    write_genbank(built.product, tmp_path / "unit.gb")
+
+    lib = Library(tmp_path)
+    lib.scan()
+    whole = level3.unit_contents(lib, lib.get("unit"))
+    assert [p["part_type"] for p in whole] == ["2", "3", "4"]
+    assert all(p["known"] for p in whole)
+
+    # take the coding sequence off the shelf: position 3 becomes a gap
+    (tmp_path / f"{CANONICAL['3']}.gb").unlink()
+    lib = Library(tmp_path)
+    lib.scan()
+
+    after = level3.unit_contents(lib, lib.get("unit"))
+    gaps = [p for p in after if not p["known"]]
+    assert len(gaps) == 1, f"expected one gap, got {[p['part_type'] for p in after]}"
+    assert gaps[0]["part_type"] == "3"
+    assert gaps[0]["length"] > 0
+    assert "not in the library" in gaps[0]["display"]
+
+def test_the_assemble_payload_carries_the_units(client):
+    seed = client.get("/api/level3/default").json()
+    body = {
+        "backbone": seed["backbone"],
+        "transcription_units": seed["transcription_units"],
+        "name": "pMultigene",
+    }
+    payload = client.post("/api/level3/assemble", json=body).json()
+    assert "units" in payload
+
+    # one column per fragment of the construct, backbone included, so the
+    # diagram and the bar beneath it share one set of proportions
+    assert len(payload["units"]) == len(payload["parts"])
+    assert [u["name"] for u in payload["units"]] == [p["source_name"] for p in payload["parts"]]
+    assert [u["length"] for u in payload["units"]] == [p["length"] for p in payload["parts"]]
+
+    backbones = [u for u in payload["units"] if not u["is_unit"]]
+    assert len(backbones) == 1 and backbones[0]["parts"] == []
+    units = [u for u in payload["units"] if u["is_unit"]]
+    assert [u["role"] for u in units] == [f"TU{i}" for i in range(1, len(units) + 1)]
+
+
+def test_the_columns_sum_to_the_construct(client):
+    """They did not: the diagram used whole-plasmid lengths while the bar used
+    released fragments, so the columns came to 173% of the construct."""
+    seed = client.get("/api/level3/default").json()
+    payload = client.post("/api/level3/assemble", json={
+        "backbone": seed["backbone"],
+        "transcription_units": seed["transcription_units"],
+        "name": "pMultigene",
+    }).json()
+    assert sum(u["length"] for u in payload["units"]) == payload["length"]
+
+
+def test_the_seed_prefers_units_that_actually_express_something(tmp_path):
+    """A spacer cassette assembles as well as any and shows nothing.
+
+    Seeded with two of those, the screen opens on a diagram with nothing in it
+    and teaches nothing about what the screen is for.
+    """
+    from ggassembler.levels import level2_cassette as level2
+
+    from .test_assembly import CANONICAL
+
+    for part_type, name in CANONICAL.items():
+        write_genbank(
+            synth.part_plasmid(part_type, name=name, seed=synth.seed_for(name)),
+            tmp_path / f"{name}.gb",
+        )
+    backbone = synth.cassette_plasmid(*BACKBONE, dropout="234", name="pDest", seed=41)
+    write_genbank(backbone, tmp_path / "pDest.gb")
+
+    # two cassettes on the same connectors: one with parts in it, one without
+    left, right = BACKBONE[1], BACKBONE[0]
+    lib = Library(tmp_path)
+    lib.scan()
+    built = level2.build(lib, level2.CassetteDesign(selections=dict(CANONICAL)))
+    assert built.ok
+
+    rich = synth.cassette_plasmid(
+        left, right, body=str(built.product.seq), name="expresses", seed=60
+    )
+    write_genbank(rich, tmp_path / "expresses.gb")
+    write_genbank(
+        synth.cassette_plasmid(left, right, name="spacer", seed=61), tmp_path / "spacer.gb"
+    )
+
+    library = Library(tmp_path)
+    library.scan()
+    chosen = level3.default_design(library).transcription_units
+    if "expresses" not in {*chosen} and "spacer" not in {*chosen}:
+        pytest.skip("neither candidate closed a chain in this fixture")
+    assert "expresses" in chosen, f"the seed picked {chosen} over the unit with parts"
+
+def test_stylesheets_are_served_so_a_browser_revalidates(client):
+    """A cached stylesheet is indistinguishable from a change that did not
+    work: new markup, old rules. This is a local tool whose files change under
+    a running browser, so nothing static may be cached blind."""
+    response = client.get("/static/level3/level3.css")
+    assert "no-cache" in response.headers.get("cache-control", "")
+
+
+@pytest.mark.parametrize(
+    "component, part_type, expected",
+    [
+        ("ScCCW12 Promoter", "2", "prCCW12"),
+        ("ScPDC1 Terminator", "4", "PDC1ter"),
+        ("TKL1", "3", "TKL1"),
+        # already carrying the convention: do not double it up
+        ("pTDH3", "2", "prTDH3"),
+        ("tENo1", "4", "ENo1ter"),
+        ("prCCW12", "2", "prCCW12"),
+        ("ADH1ter", "4", "ADH1ter"),
+        # only the first thing named; a summary is not one part
+        ("His3 Promoter · His3", "2", "prHis3"),
+        ("Spacer", "234", "Spacer"),
+        ("", "3", ""),
+    ],
+)
+def test_a_part_gets_the_short_name_a_map_has_room_for(component, part_type, expected):
+    """`ScCCW12 Promoter` is sixteen characters that mean `prCCW12`, and at the
+    width one fragment of a construct gets, that decides whether the name sits
+    on one line or three."""
+    assert level3.short_label(component, part_type) == expected
+
+def test_a_design_names_the_cassettes_that_have_to_be_built_first(library):
+    """The question a project starts from: I want these expressed, in this
+    order. The answer is a list of plasmids to build before the last step."""
+    units = [level3.UnitSpec(name="one"), level3.UnitSpec(name="two")]
+    report = level3.design(library, units, name="pPathway")
+    if report.errors:
+        pytest.skip(f"this fixture cannot close a chain: {report.errors[0].message}")
+
+    assert len(report.cassettes) == 2
+    assert report.backbone
+    for plan in report.cassettes:
+        assert plan.parts["1"] and plan.parts["5"], "connectors were not assigned"
+        for position in ("6", "7", "8"):
+            assert plan.parts.get(position), f"nothing filled position {position}"
+
+
+def test_the_connectors_chain_the_cassettes_in_the_order_given(library):
+    """Unit i has to begin where unit i-1 ended, and the last has to close back
+    onto the backbone - that is the fiddly part this exists to do."""
+    backbone = next(
+        (v for v in library.multigene_vectors() if v.cassette_overhangs), None
+    )
+    assert backbone, "the fixture has no destination vector"
+    pairs, issues = level3.connector_plan(library, backbone, 3)
+    if issues:
+        pytest.skip(issues[0].message)
+
+    left, right = backbone.cassette_overhangs
+    assert pairs[0][0].connector_overhang == right, "the chain must start at the backbone"
+    assert pairs[-1][1].connector_overhang == left, "the chain must close on the backbone"
+    for before, after in zip(pairs, pairs[1:], strict=False):
+        assert before[1].connector_overhang == after[0].connector_overhang
+
+
+def test_a_chain_longer_than_the_connectors_allow_is_refused(library):
+    """Better to say the library cannot do it than to emit a design that will
+    not assemble."""
+    backbone = next(v for v in library.multigene_vectors() if v.cassette_overhangs)
+    _, issues = level3.connector_plan(library, backbone, 40)
+    assert issues and issues[0].code in ("not_enough_connectors", "no_first_connector",
+                                         "no_last_connector")
+
+
+def test_a_connector_that_blocks_multigene_is_never_designed_in(library):
+    """It would make a cassette that could never be cut out again."""
+    starts, ends = level3._connectors(library)
+    for entry in [*starts.values(), *ends.values()]:
+        assert entry.level3_ready is not False
+
+
+def test_a_design_with_no_units_is_refused(library):
+    report = level3.design(library, [], name="empty")
+    assert not report.ok
+    assert report.errors[0].code == "no_units"
+
+
+def test_the_design_endpoint_returns_a_build_order(client):
+    body = {"name": "pPathway", "units": [{"name": "one"}, {"name": "two"}]}
+    payload = client.post("/api/level3/design", json=body).json()
+    assert "report" in payload and "cassettes" in payload
+    assert payload["name"] == "pPathway"
+    if payload["ok"]:
+        assert "build order" in payload["report"]
+        assert len(payload["cassettes"]) == 2
+        for plan in payload["cassettes"]:
+            assert plan["order"], "the report must say what order to assemble in"
+
+
+def test_the_design_downloads_as_a_zip(client):
+    import io
+    import zipfile
+
+    body = {"name": "pPathway", "units": [{"name": "one"}, {"name": "two"}]}
+    response = client.post("/api/level3/design.zip", json=body)
+    assert response.status_code == 200
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    names = archive.namelist()
+    assert any(n.endswith("build-order.txt") for n in names)
+    assert archive.read([n for n in names if n.endswith(".txt")][0]).decode()
+
+
+def test_a_failed_design_does_not_print_a_build_order(library):
+    """"0 cassettes to build, then one multigene assembly" reads as a result
+    and is not one - there is nothing to build and no step 1."""
+    backbone = next(v for v in library.multigene_vectors() if v.cassette_overhangs)
+    report = level3.design(library, [level3.UnitSpec()] * 40, backbone=backbone.name)
+    assert not report.cassettes
+
+    text = level3.design_report(report, library)
+    assert "cannot be designed" in text
+    assert "0 cassette" not in text
+    assert "1. " not in text, "a failed design must not number steps"
+
+
+def test_a_backbone_that_cannot_close_says_which_ones_could(client):
+    """Naming a backbone that will not work is half an answer; the caller has
+    no way to work out the other half."""
+    payload = client.post("/api/level3/design", json={
+        "name": "pPathway",
+        "units": [{"name": "a"}, {"name": "b"}],
+        "backbone": "no_such_vector",
+    }).json()
+    assert not payload["ok"]
+    assert any(i["code"] == "no_backbone" for i in payload["issues"])
+
+
+def test_the_design_dialog_does_not_borrow_the_screens_backbone(client):
+    """The backbone the multigene screen happens to be showing is not a choice
+    about this design - and the seeded one cannot close a designed chain."""
+    script = client.get("/static/level3/level3.js").text
+    block = script[script.index("function designBody()"):]
+    block = block[:block.index("}")]
+    assert "state.backbone" not in block, "the design borrows the screen's backbone"
+    assert "design-backbone" in block
+
+
+def test_leaving_the_backbone_blank_finds_one_that_works(library):
+    report = level3.design(library, [level3.UnitSpec(name="a")], backbone=None)
+    if report.errors:
+        pytest.skip(f"this fixture has no workable vector: {report.errors[0].message}")
+    assert report.backbone
+    _, issues = level3.connector_plan(library, library.get(report.backbone), 1)
+    assert not issues, "the chosen backbone cannot actually close the chain"
+
+
+def test_junctions_run_in_the_kits_own_connector_order(library):
+    """Sorting junctions by overhang is alphabetical DNA, which is arbitrary
+    against the ConN numbering: a three-unit design came out Con2 -> Con5 ->
+    Con4 -> Con1. It assembles and it reads as a mistake."""
+    index = level3.connector_names(library)
+    backbone = next(v for v in library.multigene_vectors() if v.cassette_overhangs)
+    pairs, issues = level3.connector_plan(library, backbone, 3, index)
+    if issues:
+        pytest.skip(issues[0].message)
+
+    # the ends are fixed by the backbone; the junctions between are the choice
+    junctions = [right.connector_overhang for _, right in pairs[:-1]]
+    ranks = [level3.connector_order(oh, index) for oh in junctions]
+    assert ranks == sorted(ranks), f"junctions out of order: {junctions}"
+
+
+@pytest.mark.parametrize(
+    "names, expected",
+    [
+        (["Con5"], 5),
+        (["Con2"], 2),
+        (["ConR1"], 1),
+        (["ConE"], 99),
+        ([], 99),
+    ],
+)
+def test_a_connector_is_ranked_by_the_number_it_is_known_by(names, expected):
+    index = {"XXXX": {"names": names}}
+    assert level3.connector_order("XXXX", index)[0] == expected
+
+
+def test_the_series_ends_are_found_structurally(library):
+    """A connector that exists only as a type 1 part can begin a chain and
+    never continue one, so it is the series start; only-as-type-5 can only
+    close. That is what makes the ends recognisable without a hard-coded
+    overhang - and what makes a full-range destination vector recognisable."""
+    first, last = level3.terminal_connectors(library)
+    starts, ends = level3._connectors(library)
+    assert not (first & set(ends)), "a series start cannot also close a unit"
+    assert not (last & set(starts)), "a series end cannot also begin one"
+    for overhang in set(starts) & set(ends):
+        assert overhang not in first and overhang not in last
+
+
+def test_the_design_runs_the_kits_canonical_connector_series(library):
+    """ConLS -> ConR1 / ConL1 -> ConR2 / ConL2 -> ConRE, which is how the kit
+    is numbered and how a bench protocol is written. Picking any chain that
+    merely closes gives Con2 -> Con3 -> ConR1, which assembles and reads wrong.
+    """
+    first, last = level3.terminal_connectors(library)
+    if not first or not last:
+        pytest.skip("this fixture has no terminal connectors")
+
+    report = level3.design(library, [level3.UnitSpec()] * 3)
+    if report.errors:
+        pytest.skip(report.errors[0].message)
+
+    assert report.cassettes[0].left in first, "the chain must open at the series start"
+    assert report.cassettes[-1].right in last, "the chain must close at the series end"
+
+    index = level3.connector_names(library)
+    junctions = [c.right for c in report.cassettes[:-1]]
+    ranks = [level3.connector_order(j, index) for j in junctions]
+    assert ranks == sorted(ranks)
+
+
+@pytest.mark.parametrize(
+    "side, overhang, expected",
+    [
+        ("L", "START", "ConLS"),
+        ("R", "END", "ConRE"),
+        ("L", "MID", "ConL1"),
+        ("R", "MID", "ConR1"),
+        ("L", "ODD", "ConLODD"),
+    ],
+)
+def test_a_connector_is_named_for_the_side_it_is_used_on(side, overhang, expected):
+    """One junction, two names. The same `Con1` overhang is `ConR1` as the
+    right end of one unit and `ConL1` as the left end of the next - the plasmid
+    cannot know which, because the position it is put in decides it.
+    """
+    index = {"MID": {"names": ["Con1"]}, "ODD": {"names": []}}
+    assert level3.connector_label(
+        overhang, side, index, {"START"}, {"END"}
+    ) == expected
+
+
+def test_the_build_order_says_which_side_each_connector_is(library):
+    report = level3.design(library, [level3.UnitSpec()] * 2)
+    if report.errors:
+        pytest.skip(report.errors[0].message)
+
+    text = level3.design_report(report, library)
+    for plan in report.cassettes:
+        assert plan.left_label.startswith("ConL")
+        assert plan.right_label.startswith("ConR")
+        # on the header line as well as beside the part, since the header is
+        # what you read when scanning the order
+        header = next(
+            line for line in text.splitlines()
+            if line.lstrip().startswith(f"{report.cassettes.index(plan) + 1}.")
+        )
+        assert plan.left_label in header and plan.right_label in header
+        assert f"[{plan.left_label}]" in text and f"[{plan.right_label}]" in text
+
+
+def test_the_junction_between_two_units_is_one_connector_under_two_names(library):
+    """`ConR1` closing one unit and `ConL1` opening the next are the same
+    overhang - if they were not, the cassettes would not ligate."""
+    report = level3.design(library, [level3.UnitSpec()] * 3)
+    if report.errors:
+        pytest.skip(report.errors[0].message)
+    for before, after in zip(report.cassettes, report.cassettes[1:], strict=False):
+        assert before.right == after.left
+        assert before.right_label[4:] == after.left_label[4:], (
+            f"{before.right_label} and {after.left_label} are the same junction"
+        )
+
+
+# --------------------------------------------------------------------------- #
+# the construct bar
+# --------------------------------------------------------------------------- #
+
+
+def test_the_parts_are_drawn_inside_the_construct_bar(client):
+    """Not as a diagram above it.
+
+    A separate row has to be kept aligned with the bar beneath it, and it never
+    quite is - columns drift off their segment at some zoom levels, and the
+    blocks stack when they run out of width. Drawn inside the segment there is
+    nothing to align: one element, one set of proportions, scaling together.
+    """
+    script = client.get("/static/level3/level3.js").text
+    assert "map-parts" in script and "map-part" in script
+    assert "unit-inputs" not in script, "the old diagram is still being rendered"
+
+    html = client.get("/multigene").text
+    assert "unit-inputs" not in html
+
+
+def test_every_block_in_the_bar_is_a_proportion_of_it(client):
+    """Nothing in the bar may be sized in pixels, or it stops scaling with the
+    page - which is the whole reason for drawing it here."""
+    css = client.get("/static/level3/level3.css").text
+    for selector in (".map-seg", ".map-part"):
+        start = css.index(f"\n{selector} ") + 1
+        block = css[start:css.index("}", start)]
+        assert "flex-basis: 0" in block, f"{selector} does not scale with the bar"
+        width = _css_property(block, "width")
+        assert width is None or width.endswith("%"), f"{selector} is sized in {width}"
+
+
+def test_a_part_the_library_does_not_have_is_still_drawn(client):
+    """As absence, not as nothing: a gap in the construct is a fact about it."""
+    css = client.get("/static/level3/level3.css").text
+    assert ".map-part.is-gap" in css
+    script = client.get("/static/level3/level3.js").text
+    assert "is-gap" in script
+
+
+def test_the_bar_uses_the_short_part_names(client):
+    script = client.get("/static/level3/level3.js").text
+    block = script[script.index("block.className = 'map-part'"):]
+    block = block[:block.index("row.append")]
+    assert "piece.short" in block
+
+
+def _css_property(block, name):
+    for line in block.splitlines():
+        text = line.split("/*")[0].strip()
+        if text.startswith(f"{name}:"):
+            return text.split(":", 1)[1].strip().rstrip(";").strip()
+    return None

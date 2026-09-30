@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -304,17 +306,73 @@ def test_an_override_can_be_cleared(client):
 # ------------------------------------------------------- front-end invariants --
 
 
-def test_the_ring_is_positioned_so_its_overlay_lands_on_it(client):
-    """The clickable wedges are an absolutely-positioned SVG inside .ring.
+def test_the_map_is_positioned_so_its_overlay_lands_on_it(client):
+    """Every layer of the map is absolutely positioned inside `.map`.
 
-    If .ring is not itself positioned, that overlay measures against the whole
-    stage instead, and every hit area is scaled up and lands away from the arc
-    it belongs to - which shows up as grey wedges floating over the page.
+    If `.map` is not itself positioned, they measure against whatever ancestor
+    is, and the clickable wedges end up scaled up and floating away from the
+    arcs they belong to. This bit once already, when the overlay lived inside
+    `.ring` instead.
     """
     css = client.get("/static/level2/level2.css").text
-    ring = css[css.index(".ring {"):css.index(".ring-hub")]
-    assert "position: relative" in ring, ".ring must establish the containing block"
+    block = css[css.index(".map {"):css.index(".map {") + 400]
+    assert "position: relative" in block, ".map must establish the containing block"
+    assert "aspect-ratio" in block, ".map must keep the ratio the geometry assumes"
 
+
+def test_the_bands_are_masked_to_annuli_that_actually_show(client):
+    """A radial-gradient with no size keyword sizes to farthest-corner.
+
+    On a square box that radius is side/2 x sqrt(2), so a stop written as a
+    fraction of the intended radius lands outside the circle and masks the
+    whole band away - the ring simply disappears. `closest-side` is the radius
+    the percentages are written against.
+    """
+    css = client.get("/static/level2/level2.css").text
+    masks = [line for line in css.splitlines() if "radial-gradient" in line]
+    assert masks, "the bands are not masked into annuli at all"
+    for mask in masks:
+        assert "closest-side" in mask, f"unsized radial-gradient: {mask.strip()}"
+
+
+def test_no_layer_of_the_map_is_resized_in_pixels(client):
+    """Each layer is a percentage of `.map` so the whole thing scales together.
+
+    Overriding one in pixels - as the narrow-screen rules used to - moves it off
+    the centre the callout geometry is computed around.
+    """
+    css = client.get("/static/level2/level2.css").text
+    for selector in (".ring", ".ring-features", ".ring-hub"):
+        for start in _occurrences(css, f"{selector} {{"):
+            block = css[start:css.index("}", start)]
+            for prop in ("width", "height"):
+                value = _property(block, prop)
+                if value is not None:
+                    assert value.endswith("%"), (
+                        f"{selector} sets {prop}: {value}, which will not scale"
+                    )
+
+
+def _occurrences(text, needle):
+    at, out = text.find(needle), []
+    while at != -1:
+        out.append(at)
+        at = text.find(needle, at + 1)
+    return out
+
+
+def _property(block, name):
+    """The value of one declaration, or None.
+
+    Scanned line by line rather than with a lookbehind for `;`: these rules
+    carry trailing `/* 300 / 680 */` comments, so the previous line does not
+    end in a semicolon and a cleverer regex quietly matches nothing at all.
+    """
+    for line in block.splitlines():
+        text = line.split("/*")[0].strip()
+        if text.startswith(f"{name}:"):
+            return text.split(":", 1)[1].strip().rstrip(";").strip()
+    return None
 
 def test_the_ring_paint_and_its_hit_areas_share_one_start_angle(client):
     """The arcs are painted by CSS and hit-tested by SVG, which measure angles
@@ -326,7 +384,13 @@ def test_the_ring_paint_and_its_hit_areas_share_one_start_angle(client):
 
     assert "RING_START_DEG" in js and "RING_START_RAD" in js
     assert "conic-gradient(from ${RING_START_DEG}deg" in js
-    assert js.count("conic-gradient(from") == 1, "only one place may set the start angle"
+    # two bands are painted now, the parts and their features. Both may exist;
+    # what must not is a second source of truth for where the circle starts.
+    starts = re.findall(r"conic-gradient\(from ([^,]+),", js)
+    assert starts, "nothing paints the ring"
+    assert set(starts) == {"${RING_START_DEG}deg"}, (
+        f"a band sets its own start angle: {sorted(set(starts))}"
+    )
 
     wedge = js[js.index("function wedge("):]
     wedge = wedge[:wedge.index("\n}")]
@@ -426,10 +490,11 @@ def test_every_dna_row_says_which_plasmid_it_came_from(client):
         assert component["path"], f"{component['name']} has no path"
 
 
-def test_entering_a_concentration_fills_in_the_volume(client):
+def test_entering_a_concentration_replaces_the_assumed_one(client):
     before = client.post("/api/level2/protocol", json=design()).json()
     row = [c for c in before["components"] if c["kind"] == "part"][0]
-    assert row["volume_ul"] is None
+    assert not row["measured"], "an unmeasured prep should say so"
+    assert row["volume_ul"] is not None, "it should still be pipettable"
 
     client.post(
         "/api/library/concentration", json={"path": row["path"], "conc_ng_ul": 100.0}
@@ -595,3 +660,396 @@ def test_a_design_needs_a_name(client):
     response = client.post("/api/library/designs",
                            json={"level": "level2", "name": "  ", "design": {}})
     assert response.status_code == 422
+
+
+# ------------------------------------------------------------ part features ---
+
+
+def test_each_placed_part_carries_its_own_annotations(client):
+    """The map's inner band draws these, so they must be per part, not per plasmid."""
+    body = client.post("/api/level2/assemble", json=design()).json()
+    assert body["ok"], [i["message"] for i in body["issues"]]
+    for part in body["parts"]:
+        assert "features" in part
+        for feature in part["features"]:
+            for key in ("label", "kind", "start", "end", "strand"):
+                assert key in feature
+
+
+def test_a_feature_is_reported_in_product_coordinates(client):
+    """A part sits at one place in its own plasmid and elsewhere in the product.
+
+    Reporting the source coordinates would put the feature band anywhere but
+    over the part it belongs to.
+    """
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+
+    from ggassembler.core.seqio import write_genbank
+
+    from . import synth
+
+    name = CANONICAL["3"]
+    record = synth.part_plasmid(
+        "3", insert=synth.filler(600, 3), name=name, seed=synth.seed_for(name)
+    )
+    # inside the released fragment: forward site + overhang, then the insert
+    start = len(synth.forward_site(synth.BSAI)) + 4
+    record.features.append(
+        SeqFeature(FeatureLocation(start, start + 200), type="CDS",
+                   qualifiers={"label": ["a marker gene"]})
+    )
+    record.features.append(
+        SeqFeature(FeatureLocation(start + 220, start + 320), type="terminator",
+                   qualifiers={"label": ["and its terminator"]})
+    )
+    write_genbank(record, client.library_dir / f"{name}.gb")
+    client.post("/api/library/rescan?force=true")
+
+    body = client.post("/api/level2/assemble", json=design()).json()
+    part = next(p for p in body["parts"] if p["part_type"] == "3")
+    cds = [f for f in part["features"] if f["kind"] == "CDS"]
+    assert cds, "the CDS inside the type 3 part was not reported"
+    for feature in cds:
+        assert part["start"] <= feature["start"] < part["end"], "feature starts outside its part"
+        assert feature["end"] <= part["end"], "feature runs past the end of its part"
+
+
+def test_tiny_features_are_dropped_and_the_list_is_capped(client):
+    body = client.post("/api/level2/assemble", json=design()).json()
+    for part in body["parts"]:
+        assert len(part["features"]) <= 8
+        for feature in part["features"]:
+            assert feature["end"] - feature["start"] >= 60
+
+
+def test_a_feature_covering_the_whole_part_is_not_drawn(client):
+    """It would restate the part band as a second, paler ring inside it.
+
+    Most annotations in a real library do cover their whole part - a type 3
+    plasmid's CDS is the type 3 part - so without this the feature band is a
+    washed-out copy of the band outside it rather than a view of what is in it.
+    """
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+
+    from ggassembler.core.seqio import write_genbank
+
+    from . import synth
+
+    name = CANONICAL["3"]
+    record = synth.part_plasmid("3", name=name, seed=synth.seed_for(name))
+    start = len(synth.forward_site(synth.BSAI)) + 4
+    record.features.append(
+        SeqFeature(FeatureLocation(start, start + 120), type="CDS",
+                   qualifiers={"label": ["the whole insert"]})
+    )
+    write_genbank(record, client.library_dir / f"{name}.gb")
+    client.post("/api/library/rescan?force=true")
+
+    body = client.post("/api/level2/assemble", json=design()).json()
+    part = next(p for p in body["parts"] if p["part_type"] == "3")
+    assert not [f for f in part["features"] if f["label"] == "the whole insert"]
+
+
+def test_a_tool_generated_label_is_not_drawn_as_a_feature(client):
+    """`Benchling translation` names the tool, not the thing, and was being
+    drawn on the ring - twice, since it duplicates the real annotation's span."""
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+
+    from ggassembler.core.seqio import write_genbank
+
+    from . import synth
+
+    name = CANONICAL["3"]
+    record = synth.part_plasmid("3", name=name, seed=synth.seed_for(name))
+    start = len(synth.forward_site(synth.BSAI)) + 4
+    record.features.append(
+        SeqFeature(FeatureLocation(start, start + 70), type="CDS",
+                   qualifiers={"note": ["Benchling translation"]})
+    )
+    write_genbank(record, client.library_dir / f"{name}.gb")
+    client.post("/api/library/rescan?force=true")
+
+    body = client.post("/api/level2/assemble", json=design()).json()
+    for part in body["parts"]:
+        for feature in part["features"]:
+            assert "benchling" not in feature["label"].lower()
+
+
+def test_a_lone_annotation_spanning_its_part_is_not_drawn_either(client):
+    """`ConS` across a 194 bp connector draws an arc the size of the arc above
+    it. One annotation covering most of a part restates the part; two or more
+    are structure, however large either one is."""
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+
+    from ggassembler.core.seqio import write_genbank
+
+    from . import synth
+
+    name = CANONICAL["3"]
+    start = len(synth.forward_site(synth.BSAI)) + 4
+
+    def rebuild(spans):
+        record = synth.part_plasmid("3", name=name, seed=synth.seed_for(name))
+        for offset, size, label in spans:
+            record.features.append(
+                SeqFeature(FeatureLocation(start + offset, start + offset + size),
+                           type="misc_feature", qualifiers={"label": [label]})
+            )
+        write_genbank(record, client.library_dir / f"{name}.gb")
+        client.post("/api/library/rescan?force=true")
+        body = client.post("/api/level2/assemble", json=design()).json()
+        return next(p for p in body["parts"] if p["part_type"] == "3")
+
+    alone = rebuild([(0, 100, "most of the part")])
+    assert alone["features"] == [], "a lone near-full annotation was drawn"
+
+    # the same big feature, with a second one beside it, is structure
+    paired = rebuild([(0, 100, "most of the part"), (0, 62, "and a bit of it")])
+    assert len(paired["features"]) == 2
+
+
+# ------------------------------------------------------- level 3 readiness ---
+
+
+def test_a_slot_option_says_whether_it_blocks_the_level_above(client):
+    slots = client.post("/api/level2/slots", json=design()).json()["slots"]
+    for slot in slots:
+        for option in slot["options"]:
+            assert "level3_ready" in option
+            if slot["key"] in ("1", "5"):
+                assert option["level3_ready"] in (True, False)
+            else:
+                assert option["level3_ready"] is None
+
+
+def test_the_library_row_carries_readiness_too(client):
+    rows = client.get("/api/library/plasmids").json()
+    assert any(r["level3_ready"] is not None for r in rows), "no connector parts indexed"
+    for row in rows:
+        if row["part_type"] in ("1", "5"):
+            assert row["level3_ready"] in (True, False)
+
+
+def test_a_cassette_built_on_a_blocked_connector_is_warned_about(client, tmp_path):
+    """It assembles. That is the problem: nothing said so until Level 3 failed."""
+    from ggassembler.core.enzymes import BSMBI, find_sites
+    from ggassembler.core.seqio import write_genbank
+
+    from . import synth
+
+    name = CANONICAL["1"]
+    record = synth.part_plasmid("1", insert=synth.filler(120, 42), name=name)
+    assert not find_sites(str(record.seq), BSMBI)
+    write_genbank(record, client.library_dir / f"{name}.gb")
+    client.post("/api/library/rescan?force=true")
+
+    body = client.post("/api/level2/assemble", json=design()).json()
+    assert body["ok"], "the cassette still assembles - that is the whole point"
+    codes = [i["code"] for i in body["issues"]]
+    assert "blocks_multigene" in codes
+    warning = next(i for i in body["issues"] if i["code"] == "blocks_multigene")
+    assert warning["level"] == "warning"
+    assert name in warning["message"]
+
+
+# ------------------------------------------------------------------ sweep ---
+
+
+def sweep_body(slot="2", candidates=None):
+    return {
+        "base_design": design(),
+        "slot": slot,
+        "candidates": candidates if candidates is not None else [CANONICAL["2"]],
+    }
+
+
+def test_a_sweep_builds_one_construct_per_candidate(client):
+    rows = client.post("/api/level2/sweep", json=sweep_body()).json()
+    assert rows["count"] == 1
+    assert rows["rows"][0]["name"] == CANONICAL["2"]
+    assert rows["rows"][0]["ok"]
+    assert rows["rows"][0]["length"] > 0
+
+
+def test_a_sweep_holds_every_other_position_still(client):
+    """The point of a titration: one thing varies, everything else does not."""
+    base = client.post("/api/level2/assemble", json=design()).json()
+    rows = client.post("/api/level2/sweep", json=sweep_body()).json()["rows"]
+    assert rows[0]["length"] == base["length"], "swapping in the same part changed the result"
+
+
+def test_a_candidate_that_cannot_build_is_reported_not_dropped(client):
+    """A part that fails is a result. Omitting it looks like it was never tried."""
+    body = sweep_body(candidates=[CANONICAL["2"], "no_such_plasmid"])
+    payload = client.post("/api/level2/sweep", json=body).json()
+    assert payload["count"] == 2
+    assert payload["built"] == 1
+    failed = next(r for r in payload["rows"] if r["name"] == "no_such_plasmid")
+    assert not failed["ok"]
+    assert failed["errors"]
+
+
+def test_a_sweep_reports_the_issues_of_each_candidate(client):
+    rows = client.post("/api/level2/sweep", json=sweep_body()).json()["rows"]
+    for row in rows:
+        assert "errors" in row and "warnings" in row and "codes" in row
+
+
+def test_writing_a_sweep_gives_a_genbank_each_plus_one_picklist(client):
+    import io
+    import zipfile
+
+    body = sweep_body()
+    response = client.post("/api/level2/sweep.zip", json=body)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    names = archive.namelist()
+    sheets = [n for n in names if n.endswith(".tsv")]
+    records = [n for n in names if n.endswith(".gb")]
+    assert len(sheets) == 1
+    assert len(records) == 1
+
+    sheet = archive.read(sheets[0]).decode()
+    assert CANONICAL["2"] in sheet
+    assert "assembles" in sheet
+    assert archive.read(records[0]).decode().startswith("LOCUS")
+
+
+def test_the_picklist_records_what_was_held_fixed(client):
+    import io
+    import zipfile
+
+    archive = zipfile.ZipFile(
+        io.BytesIO(client.post("/api/level2/sweep.zip", json=sweep_body()).content)
+    )
+    sheet = archive.read([n for n in archive.namelist() if n.endswith(".tsv")][0]).decode()
+    assert "held fixed" in sheet
+    assert CANONICAL["3"] in sheet, "the parts that did not vary should be named"
+
+
+def test_an_empty_sweep_is_not_an_error(client):
+    payload = client.post("/api/level2/sweep", json=sweep_body(candidates=[])).json()
+    assert payload["count"] == 0 and payload["rows"] == []
+
+
+# -------------------------------------------------------------- build log ---
+
+
+def test_an_export_is_recorded_with_every_part_that_went_into_it(client):
+    """The question this answers comes months later: which pYTK009 was in the
+    thing I built in March, and has that file changed since. So a name is not
+    enough - each part is logged with the checksum of its sequence."""
+    assert client.get("/api/library/builds").json() == []
+
+    response = client.post("/api/level2/export", json=design())
+    assert response.status_code == 200
+
+    log = client.get("/api/library/builds").json()
+    assert len(log) == 1
+    entry = log[0]
+    assert entry["name"] == "pCassette"
+    assert entry["level"] == "level2"
+    assert entry["length"] > 0
+    assert entry["at"]
+    assert len(entry["parts"]) == len(design()["selections"])
+    for part in entry["parts"]:
+        assert part["sha1"], f"{part['name']} logged without a checksum"
+        assert part["path"] and part["part_type"]
+
+
+def test_the_log_is_append_only_and_newest_first(client):
+    for name in ("first", "second", "third"):
+        client.post("/api/level2/export", json=design(name=name))
+    log = client.get("/api/library/builds").json()
+    assert [e["name"] for e in log] == ["third", "second", "first"]
+
+
+def test_a_failed_export_is_not_logged(client):
+    """Nothing was built, so nothing was built."""
+    client.post("/api/level2/export", json=design(selections={"1": "nope"}))
+    assert client.get("/api/library/builds").json() == []
+
+
+def test_the_log_records_the_issue_codes_the_build_carried(client):
+    """A construct that built with a caveat should say so in the log.
+
+    The fixtures' type 1 part carries no BsmBI site, so every cassette built
+    from them warns that it could never be released for a Level 3 assembly -
+    which is exactly the kind of thing worth finding in a build log later.
+    """
+    assembled = client.post("/api/level2/assemble", json=design()).json()
+    expected = sorted({i["code"] for i in assembled["issues"] if i["level"] != "info"})
+    assert expected, "this fixture no longer produces any warning to log"
+
+    client.post("/api/level2/export", json=design())
+    log = client.get("/api/library/builds").json()
+    assert log[0]["issues"] == expected
+
+def test_a_torn_line_does_not_hide_the_rest_of_the_log(client):
+    client.post("/api/level2/export", json=design())
+    library = client.app.state.library
+    with library.builds_path.open("a", encoding="utf-8") as handle:
+        handle.write('{"at": "truncated\n')
+    client.post("/api/level2/export", json=design(name="after"))
+
+    log = client.get("/api/library/builds").json()
+    assert [e["name"] for e in log] == ["after", "pCassette"]
+
+
+# ------------------------------------------------------------- map layout ---
+
+
+def test_a_hidden_element_is_actually_hidden(client):
+    """`[hidden]` in the UA sheet is a plain author-level rule, so any class
+    that sets `display` beats it. `.clone-report { display: flex }` did, and
+    left an empty teal bar on the page on every load."""
+    tokens = client.get("/static/tokens.css").text
+    rule = re.search(r"^\[hidden\]\s*\{([^}]*)\}", tokens, re.M)
+    assert rule, "nothing anywhere makes the hidden attribute work"
+    assert "display: none" in rule.group(1)
+    assert "!important" in rule.group(1), "a class that sets display would beat it"
+
+
+def test_every_panel_that_sets_display_can_still_be_hidden(client):
+    """Anything toggled with .hidden in script must not out-specify [hidden]."""
+    script = client.get("/static/level2/level2.js").text
+    tokens = client.get("/static/tokens.css").text
+
+    toggled = set(re.findall(r"el\('([a-z-]+)'\)\.hidden", script))
+    toggled |= set(re.findall(r"(\w+)\.hidden = ", script))
+    assert toggled, "nothing toggles hidden any more - is this test still needed?"
+    # the global rule carries !important, so no display rule can out-specify it
+    assert "display: none !important" in tokens
+
+
+def test_left_hand_callouts_are_anchored_by_their_right_edge(client):
+    """Positioned by `left` and pulled back with a transform, they escaped the
+    container: a transform moves the box after layout, so shrink-to-fit never
+    learns it has less room."""
+    script = client.get("/static/level2/level2.js").text
+    assert "box.style.right" in script, "left-hand callouts are not right-anchored"
+    css = client.get("/static/level2/level2.css").text
+    left_rule = css[css.index(".callout.is-left {"):]
+    left_rule = left_rule[:left_rule.index("}")]
+    assert "translateX(-100%)" not in left_rule
+
+
+def test_the_callout_width_scales_with_the_map(client):
+    """A width in px against a position in % runs off the end as the map narrows."""
+    css = client.get("/static/level2/level2.css").text
+    start = css.index("\n.callout {") + 1
+    block = css[start:css.index("}", start)]
+    width = _property(block, "max-width")
+    assert width and width.endswith("%"), f"max-width is {width}, which will not scale"
+
+
+def test_a_callout_does_not_print_its_component_twice(client):
+    """`label` is the component when there is one, so a callout named by
+    `label` with the component repeated below said the same thing twice."""
+    script = client.get("/static/level2/level2.js").text
+    block = script[script.index("name.className = 'callout-name'"):]
+    block = block[:block.index("callout-meta")]
+    assert "part.label" not in block, "the callout name is still the component"
+    assert "part.source_name" in block

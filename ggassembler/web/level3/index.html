@@ -73,6 +73,8 @@
               <span class="card-note" id="subtitle">&nbsp;</span>
             </div>
             <span style="flex-grow: 1"></span>
+            <button class="btn" type="button" id="design-btn">Design&hellip;</button>
+            <button class="btn" type="button" id="protocol-btn">Protocol</button>
             <button class="btn" type="button" id="save-btn" disabled>Save to library</button>
             <button class="btn btn-primary" type="button" id="export-btn" disabled>Export .gbk</button>
           </div>
@@ -92,6 +94,48 @@
       </div>
     </div>
   </div>
+  <dialog id="design-dialog" class="sheet">
+    <form method="dialog" class="sheet-head">
+      <span class="sheet-title">Design a multigene construct</span>
+      <span style="flex-grow: 1"></span>
+      <button class="btn" type="button" id="design-add">Add unit</button>
+      <button class="btn" type="button" id="design-run">Work it out</button>
+      <button class="btn btn-primary" type="button" id="design-write" disabled>Download all</button>
+      <button class="btn" value="close">Close</button>
+    </form>
+    <div class="sheet-body">
+      <p class="rx-lead">
+        Say what you want expressed. This works out the eight-part plasmids you
+        have to build first &mdash; assigning the connectors so they chain in the
+        order given &mdash; and what they assemble into.
+      </p>
+      <div class="design-head">
+        <label class="design-cell">
+          <span class="lbl" for="design-title">Construct name</span>
+          <input id="design-title" class="name-input" value="pPathway" spellcheck="false">
+        </label>
+        <label class="design-cell">
+          <span class="lbl" for="design-backbone">Destination backbone</span>
+          <select id="design-backbone">
+            <option value="">Choose one that fits</option>
+          </select>
+        </label>
+      </div>
+      <div id="design-units" class="design-units"></div>
+      <div id="design-report"></div>
+    </div>
+  </dialog>
+
+  <dialog id="protocol-dialog" class="sheet">
+    <form method="dialog" class="sheet-head">
+      <span class="sheet-title" id="protocol-title">Reaction setup</span>
+      <span style="flex-grow: 1"></span>
+      <button class="btn" type="button" id="protocol-copy">Copy</button>
+      <button class="btn" value="close">Close</button>
+    </form>
+    <div class="sheet-body" id="protocol-body"></div>
+  </dialog>
+
   <script type="module" src="/static/level3/level3.js"></script>
 </body>
 </html>

@@ -62,42 +62,6 @@
 
 /* --------------------------------------------------------------- the ring */
 
-.map {
-  position: relative;
-  height: 386px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ring {
-  /* positioned, so the SVG wedge overlay measures itself against the ring and
-     not against the whole stage - otherwise the hit areas are scaled up and
-     land nowhere near the arcs they belong to */
-  position: relative;
-  width: 340px;
-  height: 340px;
-  border-radius: 50%;
-  background: var(--chip);
-  transition: background 120ms linear;
-}
-
-.ring-hub {
-  position: absolute;
-  width: 244px;
-  height: 244px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-align: center;
-  padding: 0 24px;
-  pointer-events: none;
-}
 .ring-bp { font-family: var(--font-mono); font-size: 22px; font-weight: 500; }
 
 /* the clickable arcs sit above the painted ring, exactly over it */
@@ -106,23 +70,6 @@
 .arc-hit:hover { fill: rgba(20, 23, 26, 0.06); }
 .arc-hit:focus-visible { outline: 2px solid var(--accent); }
 
-/* ------------------------------------------------------------------ legend */
-
-.legend {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px 20px;
-}
-.legend-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-.legend-type { font-size: 12px; width: 44px; color: var(--ink-2); flex-shrink: 0; }
-.legend-name {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* -------------------------------------------------------------- junctions */
 
@@ -186,9 +133,10 @@
   .board { padding: 16px; gap: 16px; }
   .topbar { gap: 12px; padding: 0 16px; overflow-x: auto; }
   .topbar-right { display: none; }
-  .map { height: 300px; }
-  .ring { width: 260px; height: 260px; }
-  .ring-hub { width: 186px; height: 186px; }
+  /* the map scales as a whole - every layer is a percentage of it - so the
+     only thing narrow screens need is smaller type, not a resized ring */
+  .callout { max-width: 26%; }
+  .callout-name { font-size: 11px; }
   .legend { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -366,7 +314,7 @@
   color: var(--ink-2);
 }
 
-/* ------------------------------------------------------- expression track */
+
 /* The ring is proportional and correct; this is the thing you actually check.
  * Promoter, coding sequence, terminator, in the direction they are read. */
 
@@ -385,4 +333,213 @@
   font-family: var(--font-ui);
   font-size: 10px;
   fill: var(--ink-3);
+}
+
+/* ===================================================================== map */
+/* Container, ring centre and radii are the ones layout.js computes against;
+ * they are expressed here as percentages of 680 x 500 so the whole map scales
+ * without the callouts drifting off their stubs. */
+
+.map {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  aspect-ratio: 680 / 500;
+  margin: 0 auto;
+}
+
+/* r 150 -> 116, centred on (360, 270) of 680 x 500 */
+.ring {
+  position: absolute;
+  left: 30.882%;   /* (360 - 150) / 680 */
+  top: 24%;        /* (270 - 150) / 500 */
+  width: 44.118%;  /* 300 / 680 */
+  height: 60%;     /* 300 / 500 */
+  border-radius: 50%;
+  background: var(--chip);
+  -webkit-mask: radial-gradient(circle closest-side at center, transparent 0 77.33%, #000 77.33%);
+  mask: radial-gradient(circle closest-side at center, transparent 0 77.33%, #000 77.33%);
+}
+
+.map-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.callout-stub, .callout-elbow {
+  stroke: var(--control-line);
+  stroke-width: 1;
+}
+.callout-dot { fill: var(--ink-3); }
+.ring-chevron { stroke: var(--ink-2); stroke-width: 0.8; }
+
+/* the centre disc, r 96 */
+.ring-hub {
+  position: absolute;
+  left: 52.941%;  /* 360 / 680 - the ring's centre, not the container's */
+  top: 54%;       /* 270 / 500 */
+  transform: translate(-50%, -50%);
+  width: 28.235%;  /* 192 / 680 */
+  height: 38.4%;   /* 192 / 500 */
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 18px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------- callouts */
+/* Positioned from layout.js, which has already spread them so no two on a
+ * side are closer than the minimum and none has crossed another. */
+
+.callouts { position: absolute; inset: 0; pointer-events: none; }
+
+.callout {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* a percentage, because the anchor below is one too: a label measured in px
+     against a position measured in % runs off the end as the map narrows */
+  max-width: 21%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.callout.is-right { transform: translate(6px, -50%); }
+
+/* Anchored by its *right* edge - `right` is set instead of `left`, so the box
+   is laid out from the container's left edge up to the stub, and shrink-to-fit
+   can never size it past that. Pulling a left-anchored box back with
+   translateX(-100%) looks equivalent and is not: a transform moves the box
+   after layout, so it happily leaves the container. */
+.callout.is-left {
+  transform: translate(-6px, -50%);
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.callout.is-left .callout-text { align-items: flex-end; }
+.callout:hover .callout-name { color: var(--accent); }
+.callout:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.callout-badge {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  border-radius: var(--r-chip);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 17px;
+  text-align: center;
+}
+.callout-text { display: flex; flex-direction: column; min-width: 0; }
+.callout-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.callout-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.map-tools { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 4px; }
+
+/* --------------------------------------------------------- linear view */
+
+.linear { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.linear-track { display: flex; align-items: stretch; gap: 2px; }
+.linear-cell { display: flex; flex-direction: column; min-width: 0; }
+
+.linear-block {
+  height: 40px;
+  min-width: 0;
+  border: 0;
+  border-radius: 2px;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+.linear-block.is-directional {
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%);
+}
+.linear-block:hover { filter: brightness(1.06); }
+.linear-name {
+  display: block;
+  padding: 0 6px;
+  font-size: 10.5px;
+  line-height: 40px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.linear-tick {
+  padding-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+/* A part that works here and blocks the level above reads differently from a
+   part that is merely untidy. */
+.pick-warn.is-blocking {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+/* ------------------------------------------------------------------ sweep */
+
+.sweep-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sweep-controls select {
+  height: var(--h-control);
+  padding: 0 8px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+.sweep-candidates {
+  max-height: 210px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  padding: 6px 8px;
+  margin-bottom: 14px;
+}
+.sweep-candidate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.sweep-candidate span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

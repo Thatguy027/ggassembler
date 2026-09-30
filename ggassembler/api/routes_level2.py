@@ -9,12 +9,12 @@ from __future__ import annotations
 import io
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from ..core.assembly import AssemblyResult
-from ..core.library import Library
+from ..core.library import Library, remap_features
 from ..core import protocol
 from ..core.parttypes import badge_for, color_for
 from ..core.seqio import write_genbank
@@ -79,6 +79,7 @@ def _slot_payload(library: Library, design: level2.CassetteDesign) -> list[dict[
                         "length": e.length,
                         "part_type": e.call.part_type,
                         "connector_overhang": e.connector_overhang,
+                        "level3_ready": e.level3_ready,
                         "internal_sites": e.sites.part_enzyme_internal,
                         # what is annotated inside the fragment this plasmid
                         # contributes, so the picker can match on it without a
@@ -96,7 +97,35 @@ def _slot_payload(library: Library, design: level2.CassetteDesign) -> list[dict[
     return out
 
 
-def _result_payload(result: AssemblyResult, design: level2.CassetteDesign) -> dict[str, Any]:
+def _part_features(library: Library, part: Any) -> list[dict[str, Any]]:
+    """The source plasmid's annotations, in the product's coordinates.
+
+    What the map's inner band draws. Read from the library entry rather than
+    from the product record so a part that could not be placed still knows what
+    is in it, and so there is one notion of "inside this part" - the one
+    `features_within` already implements.
+    """
+    entry = library.get(part.source_name)
+    if entry is None:
+        return []
+    span = entry.part_span or entry.cassette_span
+    return [
+        {
+            "label": f.label,
+            "kind": f.type,
+            "start": f.start,
+            "end": f.end,
+            "strand": f.strand,
+        }
+        for f in remap_features(
+            entry.features, span, entry.length, part.start, part.length
+        )
+    ]
+
+
+def _result_payload(
+    result: AssemblyResult, design: level2.CassetteDesign, library: Library | None = None
+) -> dict[str, Any]:
     return {
         "ok": result.ok,
         "name": design.name,
@@ -115,6 +144,7 @@ def _result_payload(result: AssemblyResult, design: level2.CassetteDesign) -> di
                 "left_overhang": p.left_overhang,
                 "right_overhang": p.right_overhang,
                 "color": p.color,
+                "features": _part_features(library, p) if library else [],
             }
             for p in result.parts
         ],
@@ -142,7 +172,7 @@ def default(request: Request) -> dict[str, Any]:
     library = get_library(request)
     design = level2.default_design(library)
     result = level2.build(library, design)
-    payload = _result_payload(result, design)
+    payload = _result_payload(result, design, library)
     payload["slots"] = _slot_payload(library, design)
     payload["is_integration"] = design.is_integration
     payload["selections"] = design.selections
@@ -168,10 +198,15 @@ def _protocol_payload(library: Library, design: level2.CassetteDesign) -> dict[s
         for _, entry in selected
         if entry is not None
     ]
+    # the sites on these leave with the fragment, which changes the programme
+    reversed_dropout = any(
+        e is not None and e.call.reversed_sites for _, e in selected
+    )
     rx = protocol.reaction(
         name=design.name,
         enzyme=library.scheme.part_enzyme,
         parts=pieces,
+        reversed_dropout=reversed_dropout,
         selection=next(
             (f"{e.ecoli_marker} + green/white" for _, e in selected
              if e is not None and e.ecoli_marker),
@@ -186,12 +221,14 @@ def _protocol_payload(library: Library, design: level2.CassetteDesign) -> dict[s
         "fmol_each": rx.fmol_each,
         "selection": rx.selection,
         "issues": rx.issues,
+        "notes": rx.notes,
         "missing": rx.missing,
+        "reversed_dropout": rx.reversed_dropout,
         "components": [
             {
                 "name": c.name, "kind": c.kind, "path": c.path, "length": c.length,
                 "conc_ng_ul": c.conc_ng_ul, "fmol": c.fmol, "ng": c.ng,
-                "volume_ul": c.volume_ul, "note": c.note,
+                "volume_ul": c.volume_ul, "measured": c.measured, "note": c.note,
             }
             for c in rx.components
         ],
@@ -240,7 +277,7 @@ def decompose(request: Request, body: DecomposeRequest) -> dict[str, Any]:
 
     found = level2.decompose(library, entry)
     design = found.to_design(body.name or f"{entry.name}-v2")
-    payload = _result_payload(level2.build(library, design), design)
+    payload = _result_payload(level2.build(library, design), design, library)
     payload["slots"] = _slot_payload(library, design)
     payload["selections"] = design.selections
     payload["name"] = design.name
@@ -263,9 +300,89 @@ def decompose(request: Request, body: DecomposeRequest) -> dict[str, Any]:
             }
             for m in found.matches
         ],
-        "gaps": [{"start": s, "length": n} for s, n in found.gaps],
+        "unmatched": [
+            {
+                "start": u.start, "end": u.end, "length": u.length,
+                "left_overhang": u.left_overhang, "right_overhang": u.right_overhang,
+                "part_type": u.part_type,
+            }
+            for u in found.unmatched
+        ],
     }
     return payload
+
+
+class SweepRequest(BaseModel):
+    """A fixed design, one position, and the parts to try in it."""
+
+    base_design: DesignRequest
+    slot: str
+    candidates: list[str] = Field(default_factory=list)
+
+
+@router.post("/sweep")
+def sweep(request: Request, body: SweepRequest) -> dict[str, Any]:
+    """Build the same design once per candidate in one position.
+
+    A promoter titration against a fixed CDS: forty-seven constructs that
+    differ in one part, where the two things worth knowing - does it assemble,
+    and how long does it come out - are the same each time.
+    """
+    library = get_library(request)
+    design = body.base_design.to_design()
+    rows = level2.sweep(library, design, body.slot, body.candidates)
+    return {
+        "slot": body.slot,
+        "name": design.name,
+        "count": len(rows),
+        "built": sum(1 for r in rows if r.ok),
+        "rows": [
+            {
+                "name": r.name,
+                "display": r.display,
+                "component": r.component,
+                "part_type": r.part_type,
+                "part_length": r.part_length,
+                "length": r.length,
+                "ok": r.ok,
+                "errors": [i.message for i in r.errors],
+                "warnings": [i.message for i in r.warnings],
+                "codes": sorted({i.code for i in r.issues if i.level != "info"}),
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.post("/sweep.zip")
+def sweep_zip(request: Request, body: SweepRequest) -> Response:
+    """Every construct in the sweep as a .gb, plus the picklist that indexes them."""
+    import io
+    import zipfile
+
+    from Bio import SeqIO
+
+    library = get_library(request)
+    design = body.base_design.to_design()
+    rows = level2.sweep(library, design, body.slot, body.candidates)
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(f"{design.name}-picklist.tsv",
+                         level2.picklist(rows, design, body.slot))
+        for filename, record in level2.sweep_products(
+            library, design, body.slot, body.candidates
+        ):
+            handle = io.StringIO()
+            record.annotations.setdefault("molecule_type", "DNA")
+            SeqIO.write(record, handle, "genbank")
+            archive.writestr(filename, handle.getvalue())
+
+    return Response(
+        buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{design.name}-sweep.zip"'},
+    )
 
 
 @router.post("/slots")
@@ -286,7 +403,7 @@ def assemble(request: Request, body: DesignRequest) -> dict[str, Any]:
     library = get_library(request)
     design = body.to_design()
     result = level2.build(library, design)
-    payload = _result_payload(result, design)
+    payload = _result_payload(result, design, library)
     payload["slots"] = _slot_payload(library, design)
     payload["is_integration"] = design.is_integration
     return payload
@@ -307,6 +424,16 @@ def export(request: Request, body: DesignRequest) -> PlainTextResponse:
 
     result.product.annotations.setdefault("molecule_type", "DNA")
     SeqIO.write(result.product, handle, "genbank")
+
+    # every export is logged with the checksum of each part that went in: a
+    # name is not evidence of what a file contained on the day it was used
+    library.log_build(
+        name=design.name,
+        level="level2",
+        parts=[e for e in (library.get(n) for n in design.selections.values()) if e],
+        length=result.length,
+        issues=sorted({i.code for i in result.issues if i.level != "info"}),
+    )
     return PlainTextResponse(
         handle.getvalue(),
         headers={"Content-Disposition": f'attachment; filename="{design.name}.gb"'},

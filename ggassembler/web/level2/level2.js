@@ -10,6 +10,10 @@
  * about overhangs on its own.
  */
 
+import {
+  RING, layoutCallouts, pointAt, strandOf,
+} from './layout.js';
+
 const state = {
   selections: {},
   split_3: false,
@@ -18,7 +22,48 @@ const state = {
   composite_left: false,
   composite_right: false,
   name: 'pCassette',
+  showDirection: true,
+  showLinear: true,
 };
+
+const VIEW_KEY = 'ggasm.map-view';
+
+/* The two map toggles, remembered between visits. Browser storage can throw
+ * outright in a private window, so a failure here leaves the defaults standing
+ * rather than taking the screen down with it. */
+function loadView() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
+    if (typeof saved.showDirection === 'boolean') state.showDirection = saved.showDirection;
+    if (typeof saved.showLinear === 'boolean') state.showLinear = saved.showLinear;
+  } catch {
+    // defaults stand
+  }
+}
+
+function saveView() {
+  try {
+    localStorage.setItem(VIEW_KEY, JSON.stringify({
+      showDirection: state.showDirection, showLinear: state.showLinear,
+    }));
+  } catch {
+    // remembering is a convenience, not a requirement
+  }
+}
+
+function wireMapTools() {
+  for (const [id, flag] of [['toggle-features', 'showDirection'],
+                            ['toggle-linear', 'showLinear']]) {
+    const button = el(id);
+    button.setAttribute('aria-pressed', String(state[flag]));
+    button.addEventListener('click', () => {
+      state[flag] = !state[flag];
+      button.setAttribute('aria-pressed', String(state[flag]));
+      saveView();
+      refresh();
+    });
+  }
+}
 
 const el = (id) => document.getElementById(id);
 
@@ -199,6 +244,20 @@ function optionRow(option, terms, chosen) {
       option.internal_sites === 1 ? '' : 's'}`;
     warn.title = 'this part still carries a site for the assembly enzyme';
     item.append(warn);
+  }
+
+  // A connector whose multigene site was domesticated away works perfectly
+  // here and makes a cassette that can never be cut out again. Said on the row
+  // rather than after the build, which is the only point it can still change
+  // the choice.
+  if (option.level3_ready === false) {
+    const blocks = document.createElement('span');
+    blocks.className = 'pick-warn is-blocking';
+    blocks.textContent = 'blocks multigene';
+    blocks.title =
+      'usable here, but this part carries no site for the multigene enzyme, '
+      + 'so the finished cassette could not be released for a Level 3 assembly';
+    item.append(blocks);
   }
 
   const len = document.createElement('span');
@@ -424,68 +483,173 @@ function panel(slot) {
 const RING_START_DEG = -90;
 const RING_START_RAD = ((RING_START_DEG - 90) * Math.PI) / 180;
 
-/** Paint the ring as a conic gradient, with a hairline between parts. */
+/* The map.
+ *
+ * The part band, the centre disc, and one callout per part round the outside.
+ * A second band drawn from each part's annotations was tried and taken out:
+ * most annotations in a real library span their whole part, so it read as a
+ * paler copy of the band outside it rather than as a view into one. What the
+ * feature data is still worth is direction - the chevrons below.
+ *
+ * Callouts rather than labels on the arcs, because of parts like a 250 bp
+ * connector in a 6 kb cassette: fourteen degrees of arc holds no text at any
+ * ring size this page can afford. The geometry and the collision pass live in
+ * layout.js, which has no DOM in it and is tested directly.
+ */
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+}
+
+/** Paint both bands, the clickable wedges, the chevrons and the callouts. */
 function drawRing(parts, total) {
-  const ring = el('ring');
+  const band = el('ring');
+  const layer = el('map-layer');
+
   if (!parts.length || !total) {
-    ring.style.background = 'var(--chip)';
-    ring.replaceChildren();
+    band.style.background = 'var(--chip)';
+    layer.replaceChildren();
+    el('callouts').replaceChildren();
     return;
   }
 
+  // --- part band: unchanged, hairline gaps and all
   const stops = [];
-  const gap = 0.6;
+  const hairline = 1.6;
   for (const part of parts) {
     const from = (part.start / total) * 360;
     const to = (part.end / total) * 360;
-    stops.push(`${part.color} ${from}deg ${Math.max(from, to - gap)}deg`);
-    stops.push(`var(--surface) ${Math.max(from, to - gap)}deg ${to}deg`);
+    stops.push(`${part.color} ${from}deg ${Math.max(from, to - hairline)}deg`);
+    stops.push(`var(--surface) ${Math.max(from, to - hairline)}deg ${to}deg`);
   }
-  ring.style.background = `conic-gradient(from ${RING_START_DEG}deg, ${stops.join(', ')})`;
+  band.style.background = `conic-gradient(from ${RING_START_DEG}deg, ${stops.join(', ')})`;
 
-  // an invisible SVG wedge per part, so an arc can be clicked and tabbed to
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 340 340');
-  svg.classList.add('arc-layer');
+  layer.replaceChildren();
+
+  // the invisible wedges that catch clicks and keyboard focus
   for (const part of parts) {
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', wedge(part.start / total, part.end / total));
+    const path = svgEl('path', { d: wedge(part.start / total, part.end / total) });
     path.classList.add('arc-hit');
     path.setAttribute('tabindex', '0');
     path.setAttribute('role', 'button');
     path.setAttribute('aria-label', `${part.part_type}: ${part.label || part.source_name}`);
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-    // the overhangs at each end are what decides whether this part can sit
-    // here at all, so they belong on the arc rather than only in the strip
-    label.textContent = [
-      `Type ${part.part_type} \u00b7 ${part.label || part.source_name}`,
+    const title = svgEl('title');
+    title.textContent = [
+      `Type ${part.part_type} · ${part.label || part.source_name}`,
       `${part.length.toLocaleString()} bp`,
-      `joins ${part.left_overhang} \u2192 ${part.right_overhang}`,
+      `joins ${part.left_overhang} → ${part.right_overhang}`,
     ].join('\n');
-    path.append(label);
+    path.append(title);
     const focus = () => focusPanel(part.part_type);
     path.addEventListener('click', focus);
     path.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); focus(); }
     });
-    svg.append(path);
+    layer.append(path);
   }
-  ring.replaceChildren(svg);
+
+  const placed = layoutCallouts(parts, total, RING_START_DEG);
+
+  if (state.showDirection) {
+    for (const item of placed.items) {
+      const strand = strandOf(item.part);
+      if (!strand) continue;
+      const at = pointAt(RING.chevron, item.theta);
+      layer.append(svgEl('path', {
+        d: 'M -5 4 L 0 -4 L 5 4 Z',
+        class: 'ring-chevron',
+        transform: `translate(${at.x} ${at.y}) rotate(${strand > 0 ? item.theta : item.theta + 180})`,
+      }));
+    }
+  }
+
+  for (const item of placed.items) {
+    layer.append(svgEl('line', {
+      class: 'callout-stub',
+      x1: item.stubStart.x, y1: item.stubStart.y,
+      x2: item.stubEnd.x, y2: item.stubEnd.y,
+    }));
+    layer.append(svgEl('circle', {
+      class: 'callout-dot', cx: item.dot.x, cy: item.dot.y, r: 2,
+    }));
+    // only where the label moved far enough that the stub end would otherwise
+    // fall outside its own box
+    if (item.needsElbow) {
+      layer.append(svgEl('line', {
+        class: 'callout-elbow',
+        x1: item.stubEnd.x, y1: item.stubEnd.y, x2: item.stubEnd.x, y2: item.y,
+      }));
+    }
+  }
+
+  renderCallouts(placed);
 }
 
+/** One label per part, placed where the collision pass put it. */
+function renderCallouts(placed) {
+  const host = el('callouts');
+  host.replaceChildren();
+
+  for (const item of placed.items) {
+    const part = item.part;
+    const box = document.createElement('button');
+    box.type = 'button';
+    box.className = `callout is-${item.side}`;
+    // right-hand labels grow rightwards from the stub; left-hand ones grow
+    // leftwards *to* it, which is `right`, not `left` plus a transform. A
+    // transform moves the box after layout, so shrink-to-fit never knows it
+    // has less room and the label walks off the left of the container.
+    const across = (item.labelX / RING.width) * 100;
+    if (item.side === 'left') box.style.right = `${100 - across}%`;
+    else box.style.left = `${across}%`;
+    box.style.top = `${(item.y / RING.height) * 100}%`;
+    box.style.height = `${placed.labelHeight}px`;
+    box.addEventListener('click', () => focusPanel(part.part_type));
+
+    const badge = document.createElement('span');
+    badge.className = 'callout-badge';
+    badge.textContent = part.part_type || '?';
+    badge.style.background = part.color;
+
+    // `label` is the component wherever there is one, so naming the callout by
+    // it and then repeating the component below printed the same string twice -
+    // once whole, once truncated. The plasmid is what you picked, what you
+    // order by, and what the panel on the left shows, so that is the name.
+    const name = document.createElement('span');
+    name.className = 'callout-name';
+    name.textContent = part.source_name;
+
+    const meta = document.createElement('span');
+    meta.className = 'callout-meta';
+    const strand = strandOf(part);
+    meta.textContent = `${part.length.toLocaleString()} bp`
+      + (part.component ? ` · ${part.component}` : '')
+      + (strand ? (strand > 0 ? ' →' : ' ←') : '');
+
+    const text = document.createElement('span');
+    text.className = 'callout-text';
+    text.append(name, meta);
+    box.append(badge, text);
+    host.append(box);
+  }
+}
+
+/** The clickable wedge for one arc, in the map's own coordinates. */
 function wedge(fromFraction, toFraction) {
-  const c = 170;
-  const outer = 170;
-  const inner = 122;
   const a0 = fromFraction * 2 * Math.PI + RING_START_RAD;
   const a1 = toFraction * 2 * Math.PI + RING_START_RAD;
   const large = a1 - a0 > Math.PI ? 1 : 0;
-  const p = (radius, angle) => `${c + radius * Math.cos(angle)} ${c + radius * Math.sin(angle)}`;
+  const p = (radius, angle) =>
+    `${RING.cx + radius * Math.cos(angle)} ${RING.cy + radius * Math.sin(angle)}`;
   return [
-    `M ${p(outer, a0)}`,
-    `A ${outer} ${outer} 0 ${large} 1 ${p(outer, a1)}`,
-    `L ${p(inner, a1)}`,
-    `A ${inner} ${inner} 0 ${large} 0 ${p(inner, a0)}`,
+    `M ${p(RING.outer, a0)}`,
+    `A ${RING.outer} ${RING.outer} 0 ${large} 1 ${p(RING.outer, a1)}`,
+    `L ${p(RING.bandInner, a1)}`,
+    `A ${RING.bandInner} ${RING.bandInner} 0 ${large} 0 ${p(RING.bandInner, a0)}`,
     'Z',
   ].join(' ');
 }
@@ -519,30 +683,6 @@ function renderPanels(slots) {
   }
 }
 
-function renderLegend(parts) {
-  el('legend').replaceChildren(
-    ...parts.map((part) => {
-      const row = document.createElement('div');
-      row.className = 'legend-row';
-
-      const swatch = document.createElement('span');
-      swatch.className = 'legend-swatch';
-      swatch.style.background = part.color;
-
-      const type = document.createElement('span');
-      type.className = 'legend-type';
-      type.textContent = `Type ${part.part_type}`;
-
-      const name = document.createElement('span');
-      name.className = 'legend-name';
-      name.textContent = part.source_name;
-      name.title = `${part.source_name} · ${part.length} bp`;
-
-      row.append(swatch, type, name);
-      return row;
-    }),
-  );
-}
 
 function renderJunctions(junctions, issues) {
   const strip = el('junction-strip');
@@ -1004,8 +1144,7 @@ async function cloneFrom(name) {
   renderPanels(result.slots);
   renderStage(result);
   drawRing(result.parts, result.length);
-  renderLegend(result.parts);
-  renderExpression(result.parts);
+  renderLinear(result.parts);
   renderJunctions(result.junctions, result.issues);
   renderIssues(result.issues);
   reportClone(result.source);
@@ -1025,13 +1164,19 @@ function reportClone(source) {
       `Every base of ${source.display} is accounted for by ${source.matches.length} `
       + 'library parts. Change any panel and rebuild.';
   } else {
-    const missing = source.length - source.covered;
     box.classList.add('is-partial');
+    // the overhangs at each end of a gap say which position the unknown part
+    // occupies, which is a far more useful thing to report than a bare length
+    const where = (source.unmatched || [])
+      .map((u) => `${u.length.toLocaleString()} bp`
+        + (u.part_type ? ` at position ${u.part_type}` : '')
+        + (u.left_overhang ? ` (${u.left_overhang}→${u.right_overhang})` : ''))
+      .join(', ');
     text.textContent =
       `${source.matches.length} of ${source.display}'s parts were found in the library, `
       + `covering ${source.covered.toLocaleString()} of ${source.length.toLocaleString()} bp. `
-      + `${missing.toLocaleString()} bp matches no part on the shelf — the panels below are `
-      + 'what could be identified, not the whole construct.';
+      + `Unaccounted for: ${where} — no part on the shelf has that sequence, so the `
+      + 'panels below are what could be identified, not the whole construct.';
   }
   box.append(text);
   const dismiss = document.createElement('button');
@@ -1242,8 +1387,7 @@ async function refresh() {
   renderPanels(result.slots);
   renderStage(result);
   drawRing(result.parts, result.length);
-  renderLegend(result.parts);
-  renderExpression(result.parts);
+  renderLinear(result.parts);
   renderJunctions(result.junctions, result.issues);
   renderIssues(result.issues);
 }
@@ -1284,7 +1428,7 @@ async function loadDefault() {
     renderStage(result);
     drawRing(result.parts, result.length);
     renderLegend(result.parts);
-  renderExpression(result.parts);
+  renderLinear(result.parts);
     renderJunctions(result.junctions, result.issues);
     renderIssues(result.issues);
     return true;
@@ -1322,6 +1466,8 @@ function wireExport() {
 el('construct-name').addEventListener('change', refresh);
 wireViewToggles();
 wireFinder();
+loadView();
+wireMapTools();
 wireClone();
 wireSaved();
 wireProtocol();
@@ -1386,124 +1532,211 @@ function wireSaved() {
   });
 }
 
-// ------------------------------------------------------------- expression ---
+// ------------------------------------------------------------------ linear ---
 
-/* The transcription unit, straightened out.
+/* The construct straightened out.
  *
- * The ring is proportional and correct and tells you nothing the legend does
- * not. What you actually check before ordering is the other thing: does the
- * promoter drive the CDS, and does the terminator follow it. That reads as a
- * line, not as a circle, so the unit is drawn again here in the direction it
- * is transcribed - promoter, coding sequence, terminator - with the CDS
- * pointed so its orientation is visible rather than implied.
+ * The ring is proportional and correct, but a circle is a poor place to read
+ * an order off. What you check before ordering reads as a line: does the promoter drive the
+ * CDS, does the terminator follow it. Blocks are sized by bp, and a part whose
+ * largest feature is stranded gets an arrow end, so direction is shown rather
+ * than implied.
  */
 
-const NS = 'http://www.w3.org/2000/svg';
-const TRACK = { width: 620, height: 64, top: 18, bar: 22 };
-
-/** Which role a part plays in the transcription unit, if any. */
-function expressionRole(partType) {
-  if (partType === '2') return 'promoter';
-  if (['3', '3a', '3b'].includes(partType)) return 'cds';
-  if (['4', '4a', '4b'].includes(partType)) return 'terminator';
-  if (partType === '234') return 'unit';
-  return null;
-}
-
-function svgNode(tag, attrs = {}) {
-  const node = document.createElementNS(NS, tag);
-  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-  return node;
-}
-
-function renderExpression(parts) {
-  const box = el('expression');
+function renderLinear(parts) {
+  const box = el('linear');
   box.replaceChildren();
+  box.hidden = !state.showLinear || !parts.length;
+  if (box.hidden) return;
 
-  const unit = parts
-    .map((part) => ({ part, role: expressionRole(part.part_type) }))
-    .filter((entry) => entry.role);
-  if (!unit.length) { box.hidden = true; return; }
-  box.hidden = false;
+  const track = document.createElement('div');
+  track.className = 'linear-track';
 
-  const total = unit.reduce((sum, e) => sum + e.part.length, 0) || 1;
-  const svg = svgNode('svg', {
-    viewBox: `0 0 ${TRACK.width} ${TRACK.height}`,
-    class: 'track',
-    role: 'img',
-    'aria-label': 'Transcription unit, 5 prime to 3 prime',
-  });
+  for (const part of parts) {
+    const cell = document.createElement('div');
+    cell.className = 'linear-cell';
+    cell.style.flexGrow = String(part.length);
 
-  let x = 0;
-  for (const { part, role } of unit) {
-    const width = Math.max((part.length / total) * TRACK.width, 10);
-    const group = svgNode('g', { class: `track-part is-${role}` });
-
-    if (role === 'cds' || role === 'unit') {
-      // a pointed block: the point is the direction of translation
-      const point = Math.min(12, width * 0.3);
-      const y = TRACK.top;
-      const h = TRACK.bar;
-      group.append(svgNode('path', {
-        d: `M ${x} ${y} H ${x + width - point} L ${x + width} ${y + h / 2} `
-           + `L ${x + width - point} ${y + h} H ${x} Z`,
-        fill: part.color,
-      }));
-    } else if (role === 'promoter') {
-      group.append(svgNode('rect', {
-        x, y: TRACK.top + 6, width, height: TRACK.bar - 6, fill: part.color, rx: 2,
-      }));
-      // the bent arrow that means "transcription starts here"
-      const bend = x + width - 4;
-      group.append(svgNode('path', {
-        d: `M ${bend} ${TRACK.top + 6} V ${TRACK.top - 8} H ${bend + 16}`,
-        fill: 'none', stroke: 'var(--ink-2)', 'stroke-width': 1.6,
-      }));
-      group.append(svgNode('path', {
-        d: `M ${bend + 12} ${TRACK.top - 12} L ${bend + 18} ${TRACK.top - 8} `
-           + `L ${bend + 12} ${TRACK.top - 4} Z`,
-        fill: 'var(--ink-2)',
-      }));
-    } else {
-      group.append(svgNode('rect', {
-        x, y: TRACK.top + 6, width, height: TRACK.bar - 6, fill: part.color, rx: 2,
-      }));
-      // the T-bar that means "transcription stops here"
-      const mid = x + width / 2;
-      group.append(svgNode('path', {
-        d: `M ${mid} ${TRACK.top + 6} V ${TRACK.top - 8} M ${mid - 8} ${TRACK.top - 8} `
-           + `H ${mid + 8}`,
-        fill: 'none', stroke: 'var(--ink-2)', 'stroke-width': 1.6,
-      }));
-    }
-
-    const title = svgNode('title');
-    title.textContent =
-      `${role} · ${part.label || part.source_name} · `
+    const block = document.createElement('button');
+    block.type = 'button';
+    block.className = 'linear-block';
+    block.style.background = part.color;
+    if (strandOf(part)) block.classList.add('is-directional');
+    block.title = `Type ${part.part_type} · ${part.label || part.source_name} · `
       + `${part.length.toLocaleString()} bp`;
-    group.append(title);
+    block.addEventListener('click', () => focusPanel(part.part_type));
 
-    if (width > 46) {
-      const text = svgNode('text', {
-        x: x + 6, y: TRACK.top + TRACK.bar + 14, class: 'track-label',
-      });
-      text.textContent = (part.label || part.source_name).slice(0, 22);
-      group.append(text);
-    }
+    const name = document.createElement('span');
+    name.className = 'linear-name';
+    name.textContent = part.label || part.source_name;
+    block.append(name);
 
-    group.addEventListener('click', () => focusPanel(part.part_type));
-    svg.append(group);
-    x += width;
+    const tick = document.createElement('span');
+    tick.className = 'linear-tick';
+    tick.textContent = part.part_type || '';
+
+    cell.append(block, tick);
+    track.append(cell);
   }
 
-  svg.append(svgNode('line', {
-    x1: 0, y1: TRACK.top - 14, x2: 0, y2: TRACK.top + TRACK.bar + 2,
-    stroke: 'var(--line)', 'stroke-width': 1,
-  }));
-  box.append(svg);
+  box.append(track);
 
   const caption = document.createElement('span');
   caption.className = 'card-note';
-  caption.textContent = "Transcription unit, 5′ → 3′ — click a block to jump to its panel.";
+  caption.textContent = '5′ → 3′ · click a block to jump to its panel';
   box.append(caption);
 }
+
+// ------------------------------------------------------------------ sweep ---
+
+/* Vary one position across many parts, holding the rest of the design still.
+ *
+ * A promoter titration against a fixed coding sequence is the standard shape
+ * of this: forty-seven type 2 parts, one construct each. Doing it by hand is
+ * forty-seven passes through this screen to learn the same two things every
+ * time - does it assemble, and how long does it come out.
+ */
+
+let sweepSlots = [];
+let sweepRows = [];
+
+function sweepBody() {
+  const chosen = [...document.querySelectorAll('#sweep-candidates input:checked')]
+    .map((box) => box.value);
+  return { base_design: state, slot: el('sweep-slot').value, candidates: chosen };
+}
+
+function renderCandidates() {
+  const slot = sweepSlots.find((s) => s.key === el('sweep-slot').value);
+  const host = el('sweep-candidates');
+  host.replaceChildren();
+  if (!slot) return;
+
+  for (const option of slot.options) {
+    const row = document.createElement('label');
+    row.className = 'sweep-candidate';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.value = option.name;
+    box.checked = true;
+    box.addEventListener('change', updateSweepCount);
+    const text = document.createElement('span');
+    text.textContent = `${option.display || option.name} · ${option.length} bp`;
+    row.append(box, text);
+    host.append(row);
+  }
+  updateSweepCount();
+}
+
+function updateSweepCount() {
+  const n = document.querySelectorAll('#sweep-candidates input:checked').length;
+  el('sweep-count').textContent = `${n} selected`;
+  el('sweep-write').disabled = !sweepRows.length;
+}
+
+function renderSweepResults(payload) {
+  sweepRows = payload.rows;
+  const host = el('sweep-results');
+  host.replaceChildren();
+
+  const summary = document.createElement('p');
+  summary.className = 'rx-lead';
+  summary.textContent =
+    `${payload.built} of ${payload.count} assemble at position ${payload.slot}.`;
+  host.append(summary);
+
+  const table = document.createElement('table');
+  table.className = 'rx-table';
+  const head = document.createElement('tr');
+  for (const [label, cls] of [['Part', ''], ['Part bp', 'num'], ['Construct bp', 'num'],
+                              ['Builds', ''], ['Notes', '']]) {
+    const th = document.createElement('th');
+    th.textContent = label;
+    if (cls) th.className = cls;
+    head.append(th);
+  }
+  table.append(head);
+
+  for (const row of payload.rows) {
+    const tr = document.createElement('tr');
+    if (!row.ok) tr.classList.add('is-missing');
+    const cells = [
+      [row.display || row.name, ''],
+      [row.part_length.toLocaleString(), 'num'],
+      [row.ok ? row.length.toLocaleString() : '', 'num'],
+      [row.ok ? 'yes' : 'no', ''],
+      [[...row.errors, ...row.warnings].join('; '), 'rx-note'],
+    ];
+    for (const [text, cls] of cells) {
+      const td = document.createElement('td');
+      if (cls) td.className = cls;
+      td.textContent = text;
+      tr.append(td);
+    }
+    table.append(tr);
+  }
+  host.append(table);
+  updateSweepCount();
+}
+
+function wireSweep() {
+  el('sweep-btn').addEventListener('click', async () => {
+    const payload = await post('/api/level2/slots', state);
+    sweepSlots = payload.slots.filter((s) => s.options.length);
+    const picker = el('sweep-slot');
+    picker.replaceChildren();
+    for (const slot of sweepSlots) {
+      const option = document.createElement('option');
+      option.value = slot.key;
+      option.textContent = `Type ${slot.key} · ${slot.options.length} parts`;
+      picker.append(option);
+    }
+    sweepRows = [];
+    el('sweep-results').replaceChildren();
+    renderCandidates();
+    el('sweep-dialog').showModal();
+  });
+
+  el('sweep-slot').addEventListener('change', () => {
+    sweepRows = [];
+    el('sweep-results').replaceChildren();
+    renderCandidates();
+  });
+  el('sweep-all').addEventListener('click', () => {
+    for (const box of document.querySelectorAll('#sweep-candidates input')) box.checked = true;
+    updateSweepCount();
+  });
+  el('sweep-none').addEventListener('click', () => {
+    for (const box of document.querySelectorAll('#sweep-candidates input')) box.checked = false;
+    updateSweepCount();
+  });
+
+  el('sweep-run').addEventListener('click', async () => {
+    const button = el('sweep-run');
+    button.disabled = true;
+    button.textContent = 'Building…';
+    try {
+      renderSweepResults(await post('/api/level2/sweep', sweepBody()));
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Build all';
+    }
+  });
+
+  el('sweep-write').addEventListener('click', async () => {
+    const response = await fetch('/api/level2/sweep.zip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sweepBody()),
+    });
+    if (!response.ok) return;
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${state.name}-sweep.zip`;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+wireSweep();

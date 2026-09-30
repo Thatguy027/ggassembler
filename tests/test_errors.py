@@ -201,3 +201,67 @@ def test_nothing_raises_for_any_of_these(cassette_library):  # noqa: F811
         assert not result.ok
         assert result.errors
         assert all(i.level == ERROR for i in result.errors)
+
+
+# --------------------------------------------------------------------------- #
+# ggasm check
+# --------------------------------------------------------------------------- #
+
+
+def test_check_needs_a_baseline_before_it_can_compare(tmp_path, capsys):
+    from ggassembler.cli import main
+
+    write_genbank(synth.part_plasmid("2", name="promoter"), tmp_path / "promoter.gb")
+    code = main(["check", str(tmp_path), "--baseline", str(tmp_path / "base.json")])
+    assert code == 2, "no baseline is neither a pass nor a failure"
+    assert "--update" in capsys.readouterr().err
+
+
+def test_a_clean_library_passes(tmp_path, capsys):
+    from ggassembler.cli import main
+
+    write_genbank(synth.part_plasmid("2", name="promoter"), tmp_path / "promoter.gb")
+    baseline = tmp_path / "base.json"
+    assert main(["check", str(tmp_path), "--baseline", str(baseline), "--update"]) == 0
+    assert baseline.exists()
+    assert main(["check", str(tmp_path), "--baseline", str(baseline)]) == 0
+    assert "nothing new" in capsys.readouterr().out
+
+
+def test_a_newly_added_problem_fails_the_check(tmp_path, capsys):
+    """The whole point of the hook: this commit made things worse."""
+    from ggassembler.cli import main
+
+    write_genbank(synth.part_plasmid("2", name="promoter"), tmp_path / "promoter.gb")
+    baseline = tmp_path / "base.json"
+    main(["check", str(tmp_path), "--baseline", str(baseline), "--update"])
+
+    write_genbank(synth.plasmid_without_bsai(name="mystery"), tmp_path / "mystery.gb")
+    assert main(["check", str(tmp_path), "--baseline", str(baseline)]) == 1
+    assert "new unrecognised: mystery" in capsys.readouterr().err
+
+
+def test_a_problem_already_in_the_baseline_does_not_fail(tmp_path, capsys):
+    """A library of several hundred files always has some. A hook that fails on
+    what was already there is a hook people disable."""
+    from ggassembler.cli import main
+
+    write_genbank(synth.part_plasmid("2", name="promoter"), tmp_path / "promoter.gb")
+    write_genbank(synth.plasmid_without_bsai(name="mystery"), tmp_path / "mystery.gb")
+    baseline = tmp_path / "base.json"
+    main(["check", str(tmp_path), "--baseline", str(baseline), "--update"])
+
+    assert main(["check", str(tmp_path), "--baseline", str(baseline)]) == 0
+
+
+def test_fixing_a_problem_is_reported_but_still_passes(tmp_path, capsys):
+    from ggassembler.cli import main
+
+    write_genbank(synth.part_plasmid("2", name="promoter"), tmp_path / "promoter.gb")
+    write_genbank(synth.plasmid_without_bsai(name="mystery"), tmp_path / "mystery.gb")
+    baseline = tmp_path / "base.json"
+    main(["check", str(tmp_path), "--baseline", str(baseline), "--update"])
+
+    (tmp_path / "mystery.gb").unlink()
+    assert main(["check", str(tmp_path), "--baseline", str(baseline)]) == 0
+    assert "1 fewer" in capsys.readouterr().out

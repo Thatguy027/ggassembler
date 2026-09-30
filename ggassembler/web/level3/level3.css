@@ -108,12 +108,56 @@
 /* ------------------------------------------------------------- linear map */
 
 .map { display: flex; flex-direction: column; gap: 8px; min-height: 64px; }
-.map-bar { display: flex; height: 40px; border-radius: 6px; overflow: hidden; }
-.map-seg {
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; color: #FFF; overflow: hidden; white-space: nowrap;
-  padding: 0 6px; min-width: 0;
+/* The construct, each transcription unit opened into the parts that built it.
+   Everything is a proportion of the bar, so it all scales together. */
+.map-bar {
+  display: flex;
+  height: 52px;
+  border-radius: 6px;
+  overflow: hidden;
+  gap: 1px;
+  background: var(--line);
 }
+.map-seg {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.map-seg.is-plain { align-items: center; justify-content: center; }
+
+.map-parts { display: flex; flex: 1 1 auto; min-height: 0; gap: 1px; }
+.map-part {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-basis: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--ink);
+}
+.map-part.is-gap {
+  background: repeating-linear-gradient(
+    -45deg, var(--chip), var(--chip) 4px, var(--surface) 4px, var(--surface) 8px
+  ) !important;
+  color: var(--ink-3);
+}
+
+.map-seg-name {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  background: var(--surface);
+  font-size: 10px;
+  color: var(--ink-2);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.map-seg.is-plain .map-seg-name { background: none; color: #FFF; }
 .map-seg + .map-seg { border-left: 2px solid var(--surface); }
 .map-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
 
@@ -143,3 +187,67 @@
   .board { padding: 16px; gap: 16px; }
   .topbar { gap: 12px; padding: 0 16px; overflow-x: auto; }
 }
+
+/* ----------------------------------------------------------------- design */
+
+.design-head {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.design-head .name-input, .design-head select {
+  height: var(--h-control);
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+.design-units { display: flex; flex-direction: column; gap: 10px; }
+
+.design-unit {
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  padding: 10px 12px;
+}
+.design-unit-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.design-unit-head .lbl { min-width: 54px; }
+.design-unit-name {
+  flex-grow: 1;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-chip);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.design-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.design-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.design-cell select {
+  height: var(--h-control);
+  min-width: 0;
+  padding: 0 6px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.design-report {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--ink-2);
+}
+@media (max-width: 640px) { .design-grid { grid-template-columns: minmax(0, 1fr); } }
