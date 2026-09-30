@@ -21,6 +21,7 @@ from . import (
     routes_level2,
     routes_level3,
     routes_library,
+    routes_plate,
     routes_sequencing,
     routes_uniprot,
 )
@@ -36,6 +37,7 @@ SCREENS = {
     "/library": "library",
     "/proteins": "uniprot",
     "/sequencing": "sequencing",
+    "/plate": "plate",
 }
 
 
@@ -55,6 +57,7 @@ def create_app(
     app.include_router(routes_library.router)
     app.include_router(routes_uniprot.router)
     app.include_router(routes_sequencing.router)
+    app.include_router(routes_plate.router)
     app.include_router(routes_level2.router)
 
     # Level 1 and Level 3 come online when their routers exist; until then the

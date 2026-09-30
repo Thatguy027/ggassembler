@@ -174,10 +174,7 @@ function hitRow(hit, position, terms) {
   const mark = document.createElement('span');
   mark.className = 'badge';
   mark.textContent = hit.part_type ? hit.part_type : '—';
-  if (hit.badge_bg) {
-    mark.style.background = hit.badge_bg;
-    mark.style.color = hit.badge_fg;
-  }
+  mark.dataset.part = hit.part_type || '';
   row.append(mark);
 
   const what = document.createElement('span');

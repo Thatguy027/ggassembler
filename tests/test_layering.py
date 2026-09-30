@@ -96,10 +96,25 @@ def layer(dotted: str) -> str:
     return head if head in {"core", "levels", "api", "web"} else ""
 
 
-def level_of(dotted: str) -> str | None:
-    """``level1`` for ``levels.level1_part`` or ``api.routes_level1``, else None."""
-    m = re.search(r"level([123])", dotted.split(".")[1] if "." in dotted else "")
-    return f"level{m.group(1)}" if m else None
+def area_of(dotted: str) -> str | None:
+    """The screen a module belongs to, from its file name.
+
+    ``levels/level2_cassette.py`` and ``api/routes_level2.py`` are both
+    ``level2``; ``levels/plate_batch.py`` and ``api/routes_plate.py`` are both
+    ``plate``. Named by convention rather than by a list, so a new screen that
+    follows the convention is governed by the same rule as the three assembly
+    levels without this file having to learn about it.
+    """
+    tail = dotted.split(".")[1] if "." in dotted else ""
+    if not tail:
+        return None
+    if tail.startswith("routes_"):
+        return tail[len("routes_"):] or None
+    return tail.split("_")[0] or None
+
+
+#: Kept under the old name: most of this file reads better saying "level".
+level_of = area_of
 
 
 def violation(src: str, dst: str) -> str | None:
@@ -115,21 +130,21 @@ def violation(src: str, dst: str) -> str | None:
     elif src_layer == "levels":
         if dst_layer in {"api", "web"}:
             return f"levels/ must not import {dst_layer}/"
-        if dst_layer == "levels" and level_of(dst) != level_of(src):
+        if dst_layer == "levels" and area_of(dst) != area_of(src):
             return "levels must not import one another"
 
     elif src_layer == "api":
         if dst_layer == "web":
             return "api/ must not import web/"
         if dst_layer == "levels":
-            own = level_of(src)
+            own = area_of(src)
             if own is None:
-                return f"only api/routes_levelN.py may import levels/ (not {src})"
+                return f"only a routes_<screen>.py may import levels/ (not {src})"
             if dst == "levels":
                 # the bare package, from `from ..levels import levelN_x`; the
                 # submodule that import also records is what gets judged
                 return None
-            if level_of(dst) != own:
+            if area_of(dst) != own:
                 return f"api/routes_{own}.py may import only levels/{own}_*"
 
     return None
@@ -264,6 +279,12 @@ def test_rule_checker_catches_known_violations():
 
     assert violation("levels.level2_cassette", "core.assembly") is None
     assert violation("api.routes_level2", "levels.level2_cassette") is None
+    # a screen that is not one of the three assembly levels is governed the
+    # same way, by name, with no list of screens anywhere in this file
+    assert violation("api.routes_plate", "levels.plate_batch") is None
+    assert violation("api.routes_plate", "levels.level2_cassette")
+    assert violation("levels.plate_batch", "levels.level3_multigene")
+    assert violation("api.routes_library", "levels.plate_batch")
     assert violation("api.routes_level2", "levels") is None  # `from ..levels import ...`
     assert violation("api.routes_level2", "core.parttypes") is None
     assert violation("core.assembly", "core.enzymes") is None
@@ -276,6 +297,37 @@ def test_relative_and_absolute_imports_resolve_alike(tmp_path):
     path.write_text(src, encoding="utf-8")
     targets = {t for t, _ in internal_imports("api.routes_level2", path)}
     assert "core" in targets and "core.assembly" in targets
+
+
+def test_no_screen_takes_a_badge_colour_from_the_api():
+    """Colour is resolved from the part type in CSS, never sent as hex.
+
+    It used to be sent: every payload carried `color`, `badge_bg` and
+    `badge_fg`. That is invisible until the page can be themed, and then it
+    fails in the worst way - a theme switch restyles everything except the ring
+    arcs and the type badges, which are the only places colour carries meaning.
+
+    The matching half of this - that no endpoint sends a literal colour at all -
+    is checked against live responses in `test_api.py`, because whether a value
+    is a token or a hex code is not something a grep over the front end can
+    see. What it *can* see is the two field names that used to carry hex.
+    """
+    offences = []
+    for path in sorted(WEB.rglob("*.js")):
+        source = path.read_text(encoding="utf-8")
+        for field in ("badge_bg", "badge_fg"):
+            if field in source:
+                offences.append(f"web/{path.relative_to(WEB)}: reads {field} from a payload")
+    assert not offences, "colour taken from the API:\n" + "\n".join(offences)
+
+
+def test_the_part_palette_is_mapped_in_the_one_shared_file():
+    """Guard the other half: the mapping has to exist for the above to work."""
+    tokens = (WEB / "tokens.css").read_text(encoding="utf-8")
+    for position in range(1, 9):
+        assert f'[data-part^="{position}"]' in tokens, f"no rule for part {position}"
+        assert f"--part-{position})" in tokens
+    assert "--part-color" in tokens and "--badge-bg" in tokens and "--badge-fg" in tokens
 
 
 def test_tokens_css_is_the_only_shared_front_end_file():

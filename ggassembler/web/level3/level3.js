@@ -315,7 +315,8 @@ function renderMap(result) {
         // proportional within the segment, so a gene reads as a gene and a
         // terminator as a sliver - the same scale as the construct itself
         block.style.flexGrow = String(Math.max(piece.length, 1));
-        block.style.background = piece.color;
+        block.dataset.part = piece.part_type || '';
+        block.style.background = 'var(--part-color)';
         block.textContent = piece.short || piece.component || piece.name || '';
         block.title = `type ${piece.part_type} · `
           + `${piece.component || piece.name || 'not in the library'} · `
@@ -325,7 +326,8 @@ function renderMap(result) {
       seg.append(row);
     } else {
       seg.classList.add('is-plain');
-      seg.style.background = part.color || 'var(--part-8)';
+      seg.dataset.part = part.part_type || '';
+      seg.style.background = 'var(--part-color)';
     }
 
     const label = document.createElement('span');
@@ -513,8 +515,7 @@ function hitRow(hit, index, terms) {
   const mark = document.createElement('span');
   mark.className = 'badge';
   mark.textContent = use === 'backbone' ? 'BB' : use === 'unit' ? 'TU' : '—';
-  mark.style.background = hit.badge_bg;
-  mark.style.color = hit.badge_fg;
+  mark.dataset.part = hit.part_type || '';
   row.append(mark);
 
   const what = document.createElement('span');

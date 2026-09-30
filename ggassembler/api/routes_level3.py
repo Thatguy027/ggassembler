@@ -61,7 +61,6 @@ def _payload(result: level3.MultigeneResult, library: Library | None = None) -> 
                 "length": p.length,
                 "left_overhang": p.left_overhang,
                 "right_overhang": p.right_overhang,
-                "color": p.color,
                 "part_type": p.part_type,
             }
             for p in assembly.parts

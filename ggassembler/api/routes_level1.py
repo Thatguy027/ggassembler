@@ -13,7 +13,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from ..core.library import Library
-from ..core.parttypes import DESCRIPTIONS, badge_for, color_for
+from ..core.parttypes import DESCRIPTIONS
 from ..levels import level1_part as level1
 
 router = APIRouter(prefix="/api/level1", tags=["level1"])
@@ -79,8 +79,6 @@ def _payload(result: level1.Level1Design) -> dict[str, Any]:
         "part_type": result.part_type,
         "five_prime": result.five_prime,
         "three_prime": result.three_prime,
-        "color": color_for(result.part_type),
-        "badge": dict(zip(("bg", "fg"), badge_for(result.part_type), strict=True)),
         "body_length": len(result.body),
         "entry_vector": result.entry_vector,
         "destination": result.destination,
@@ -142,14 +140,11 @@ def options(request: Request) -> dict[str, Any]:
     for name in (*scheme.atoms, *(w for _, _, w in scheme.merges), "234", "678"):
         if name in {t["name"] for t in types}:
             continue
-        bg, fg = badge_for(name, scheme)
         types.append(
             {
                 "name": name,
                 "description": DESCRIPTIONS.get(name, "composite part"),
                 "five_prime": None,
-                "badge_bg": bg,
-                "badge_fg": fg,
             }
         )
     from ..core.parttypes import type_overhangs

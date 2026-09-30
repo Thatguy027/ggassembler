@@ -17,7 +17,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from ..core.library import Library, PlasmidEntry, triage
-from ..core.parttypes import badge_for, color_for, is_composite
+from ..core.parttypes import is_composite
 from ..core.search import search as run_search
 
 router = APIRouter(prefix="/api/library", tags=["library"])
@@ -44,7 +44,6 @@ def compact(entry: PlasmidEntry, scheme_name: str = "YTK") -> dict[str, Any]:
     from ..core.parttypes import get_scheme
 
     scheme = get_scheme(entry.scheme or scheme_name)
-    badge_bg, badge_fg = badge_for(entry.call.part_type, scheme)
     return {
         "path": entry.path,
         "name": entry.name,
@@ -95,9 +94,6 @@ def compact(entry: PlasmidEntry, scheme_name: str = "YTK") -> dict[str, Any]:
             or (entry.call.part_type and entry.call.confidence != "digest")
             or entry.internal_multigene_positions
         ),
-        "color": color_for(entry.call.part_type, scheme),
-        "badge_bg": badge_bg,
-        "badge_fg": badge_fg,
     }
 
 
@@ -184,7 +180,6 @@ def search(
     )
     out = []
     for hit in hits:
-        badge_bg, badge_fg = badge_for(hit.part_type, scheme)
         out.append({
             "name": hit.name,
             "display": hit.display,
@@ -206,9 +201,6 @@ def search(
             "in_part": hit.in_part,
             "usable_as_part": hit.usable_as_part,
             "usable_as_unit": hit.usable_as_unit,
-            "color": color_for(hit.part_type, scheme),
-            "badge_bg": badge_bg,
-            "badge_fg": badge_fg,
         })
     return {"query": q, "count": len(out), "hits": out, "suppressed": suppressed}
 
@@ -393,12 +385,9 @@ def types(request: Request) -> list[dict[str, object]]:
         if name in seen:
             continue
         seen.add(name)
-        bg, fg = badge_for(name, scheme)
         out.append({
             "name": name,
             "description": DESCRIPTIONS.get(name, "composite part"),
             "count": counts.get(name, 0),
-            "badge_bg": bg,
-            "badge_fg": fg,
         })
     return out

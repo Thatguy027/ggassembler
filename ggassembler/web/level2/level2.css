@@ -67,7 +67,7 @@
 /* the clickable arcs sit above the painted ring, exactly over it */
 .arc-layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .arc-hit { cursor: pointer; fill: transparent; }
-.arc-hit:hover { fill: rgba(20, 23, 26, 0.06); }
+.arc-hit:hover { fill: var(--wash-strong); }
 .arc-hit:focus-visible { outline: 2px solid var(--accent); }
 
 
@@ -176,7 +176,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-control);
   background: var(--surface);
-  box-shadow: 0 10px 26px rgba(20, 23, 26, 0.16);
+  box-shadow: var(--shadow-3);
 }
 
 .pick-group {
@@ -440,7 +440,7 @@
   width: 17px;
   height: 17px;
   border-radius: var(--r-chip);
-  color: #fff;
+  color: var(--on-part);
   font-family: var(--font-mono);
   font-size: 10px;
   line-height: 17px;
@@ -502,7 +502,7 @@
   padding: 0 6px;
   font-size: 10.5px;
   line-height: 40px;
-  color: #fff;
+  color: var(--on-part);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

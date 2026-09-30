@@ -124,8 +124,9 @@ function typePill(row) {
   pill.className = 'type-pill';
   if (row.source === 'manual') pill.classList.add('type-pill-manual');
   pill.textContent = row.part_type || '—';
-  pill.style.background = row.part_type ? row.badge_bg : 'var(--unknown-bg)';
-  pill.style.color = row.part_type ? row.badge_fg : 'var(--unknown-fg)';
+  // tokens.css maps the type to its pair, and falls back to the unknown pair
+  // when there is no type at all - which is most of this column
+  pill.dataset.part = row.part_type || '';
   pill.title = `${row.reason}\n\nClick to assign a type by hand`;
   pill.setAttribute('aria-label', `Type ${row.part_type || 'unassigned'} for ${row.name}. Assign by hand.`);
   pill.addEventListener('click', () => openAssign(row));

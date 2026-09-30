@@ -79,12 +79,25 @@ async function post(path, body) {
 
 // --------------------------------------------------------------- panels ---
 
+/* The conic-gradient is the one place a part colour has to become a literal
+ * string: a gradient stop cannot be a var() that changes underneath it, because
+ * the whole background is one computed value. So it is read from the document
+ * at paint time rather than baked in, and the ring is repainted on a theme
+ * change - see `repaint` below. */
+function partColor(partType) {
+  const position = String(partType || '').charAt(0);
+  const token = /[1-8]/.test(position) ? `--part-${position}` : '--unknown-bg';
+  const value = getComputedStyle(document.documentElement).getPropertyValue(token);
+  return value.trim() || 'var(--unknown-bg)';
+}
+
 function badge(slot) {
   const span = document.createElement('span');
   span.className = 'badge';
   span.textContent = slot.label;
-  span.style.background = slot.badge_bg;
-  span.style.color = slot.badge_fg;
+  // the type, not a colour: tokens.css turns it into one, and a theme switch
+  // re-resolves it without anything here running again
+  span.dataset.part = slot.key || '';
   return span;
 }
 
@@ -506,6 +519,15 @@ function svgEl(tag, attrs = {}) {
 }
 
 /** Paint both bands, the clickable wedges, the chevrons and the callouts. */
+/* The ring is the one thing on this screen with a colour baked into a computed
+ * value rather than a var(), so it is the one thing a theme switch cannot fix
+ * on its own. Everything else re-resolves through `data-part`. */
+let lastDrawn = null;
+
+document.addEventListener('themechange', () => {
+  if (lastDrawn) drawRing(lastDrawn.parts, lastDrawn.length);
+});
+
 function drawRing(parts, total) {
   const band = el('ring');
   const layer = el('map-layer');
@@ -523,7 +545,7 @@ function drawRing(parts, total) {
   for (const part of parts) {
     const from = (part.start / total) * 360;
     const to = (part.end / total) * 360;
-    stops.push(`${part.color} ${from}deg ${Math.max(from, to - hairline)}deg`);
+    stops.push(`${partColor(part.part_type)} ${from}deg ${Math.max(from, to - hairline)}deg`);
     stops.push(`var(--surface) ${Math.max(from, to - hairline)}deg ${to}deg`);
   }
   band.style.background = `conic-gradient(from ${RING_START_DEG}deg, ${stops.join(', ')})`;
@@ -613,7 +635,8 @@ function renderCallouts(placed) {
     const badge = document.createElement('span');
     badge.className = 'callout-badge';
     badge.textContent = part.part_type || '?';
-    badge.style.background = part.color;
+    badge.dataset.part = part.part_type || '';
+    badge.style.background = 'var(--part-color)';
 
     // `label` is the component wherever there is one, so naming the callout by
     // it and then repeating the component below printed the same string twice -
@@ -853,8 +876,7 @@ function hitRow(hit, index, terms) {
   const mark = document.createElement('span');
   mark.className = 'badge';
   mark.textContent = hit.part_type ? hit.part_type : '—';
-  mark.style.background = hit.badge_bg;
-  mark.style.color = hit.badge_fg;
+  mark.dataset.part = hit.part_type || '';
   row.append(mark);
 
   const what = document.createElement('span');
@@ -1143,6 +1165,7 @@ async function cloneFrom(name) {
 
   renderPanels(result.slots);
   renderStage(result);
+  lastDrawn = result;
   drawRing(result.parts, result.length);
   renderLinear(result.parts);
   renderJunctions(result.junctions, result.issues);
@@ -1560,7 +1583,8 @@ function renderLinear(parts) {
     const block = document.createElement('button');
     block.type = 'button';
     block.className = 'linear-block';
-    block.style.background = part.color;
+    block.dataset.part = part.part_type || '';
+    block.style.background = 'var(--part-color)';
     if (strandOf(part)) block.classList.add('is-directional');
     block.title = `Type ${part.part_type} · ${part.label || part.source_name} · `
       + `${part.length.toLocaleString()} bp`;

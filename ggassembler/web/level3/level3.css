@@ -94,7 +94,7 @@
   position: absolute;
   top: 0;
   height: 100%;
-  background: rgba(184, 92, 56, 0.16);
+  background: var(--accent-wash);
   border-left: 1px solid var(--accent);
   border-right: 1px solid var(--accent);
 }
@@ -157,7 +157,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.map-seg.is-plain .map-seg-name { background: none; color: #FFF; }
+.map-seg.is-plain .map-seg-name { background: none; color: var(--on-part); }
 .map-seg + .map-seg { border-left: 2px solid var(--surface); }
 .map-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
 

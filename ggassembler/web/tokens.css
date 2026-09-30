@@ -123,14 +123,27 @@
 }
 
 :root {
-  /* surfaces, warm paper over near-black ink */
-  --bg:            #F7F5F0;
+  /* ------------------------------------------------------------- Paper */
+  /* The default. Warm paper under near-black ink.
+   *
+   * `--ground` is the page; `--surface` is a card on it; `--surface-sunk` is a
+   * well *inside* a card. Those three have to be visibly different or the
+   * layering stops reading - the old values were #F7F5F0 / #FFFFFF / #FDFCFA,
+   * and a sunk well one percent off white is not a well, it is a rectangle
+   * nobody notices. The ground has been pushed down so white cards sit above
+   * it rather than merging into it. */
+  --ground:        #EFECE4;
   --surface:       #FFFFFF;
-  --surface-sunk:  #FDFCFA;
+  --surface-sunk:  #F4F1EA;
+  --surface-raised:#FFFFFF;
   --chip:          #F2EFE9;
   --ink:           #14171A;
   --ink-2:         #5F6670;
-  --ink-3:         #7A818A;
+  --ink-3:         #666D76;
+
+  /* `--bg` is what every screen still writes. Kept as an alias so the rename
+   * is one line here rather than a sweep through five stylesheets. */
+  --bg:            var(--ground);
 
   /* the dark header, and text on it */
   --header:        #14171A;
@@ -140,15 +153,15 @@
   --on-dark-2:     #9AA0A6;
   --on-dark-3:     #B9BEC4;
 
-  --line:          #E2DCD1;
-  --line-soft:     #EFEAE1;
-  --control-line:  #D6CFC2;
+  --line:          #E0D9CD;
+  --line-soft:     #EDE8DE;
+  --control-line:  #D8D0C2;
 
   --accent:        #B85C38;
   --accent-hover:  #8F4426;
   --ok:            #2F6F6B;
   --ok-bg:         #E4EEEC;
-  --warn:          #8A6A12;
+  --warn:          #7E600F;
   --warn-bg:       #F7EFD6;
   --error:         #A3342C;
   --error-bg:      #F8E3E1;
@@ -156,8 +169,21 @@
   /* a row that needs a human: internal sites, a conflict, or no call at all */
   --attention:     #8A5A00;
   --attention-bg:  #FBF3E2;
+  --attention-bg-2:#F7EDD8;   /* the same row, hovered */
   --unknown-bg:    #F0EBE0;
   --unknown-fg:    #5C5343;
+
+  /* Elevation. Tinted with the ink, never pure black: pure black over warm
+   * paper reads grey and dirty. */
+  --shadow-1: 0 1px 2px rgba(20, 23, 26, .05), 0 1px 1px rgba(20, 23, 26, .03);
+  --shadow-2: 0 2px 4px rgba(20, 23, 26, .05), 0 6px 16px rgba(20, 23, 26, .07);
+  --shadow-3: 0 10px 28px rgba(20, 23, 26, .14);
+
+  /* washes and overlays, so no stylesheet has to spell an rgba() of the ink */
+  --wash:        rgba(20, 23, 26, .04);
+  --wash-strong: rgba(20, 23, 26, .07);
+  --accent-wash: rgba(184, 92, 56, .10);
+  --backdrop:    rgba(20, 23, 26, .38);
 
   /* type */
   --font-display:  'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
@@ -186,6 +212,18 @@
   --part-7: #9E6A3C;
   --part-8: #8C8A86;
 
+  /* Text that sits *on* a part colour, and it is the ink, not white.
+   *
+   * White was what the badges used, and it fails on seven of the eight arcs -
+   * worst on Type 3 yellow at 1.75:1, which is a single character nobody can
+   * read. Dark ink clears 3:1 on all eight and 4.5:1 on seven; the exception
+   * is Type 7 brown at 3.9:1, which is the darkest arc in the palette and the
+   * one a lighter foreground would suit - but one token has to serve all
+   * eight, and 3.9 on one is far better than 1.75 on another. */
+  --on-part:   #14171A;
+  /* and on the accent, which `.btn-primary` fills with */
+  --on-accent: #FFFFFF;
+
   /* the matching panel badges: pale ground, dark ink */
   --badge-1-bg: #DCEAF3; --badge-1-fg: #1F4F6B;
   --badge-2-bg: #E4F0D5; --badge-2-fg: #3E5C1E;
@@ -196,6 +234,93 @@
   --badge-7-bg: #EFE0D2; --badge-7-fg: #5C3A18;
   --badge-8-bg: #E6E4E1; --badge-8-fg: #3A3A38;
 }
+
+/* ------------------------------------------------------------------ Slate */
+/* Two things here are easy to get wrong, and both are deliberate.
+ *
+ * `--surface-sunk` is *darker* than `--surface`. A well recedes on dark by
+ * going down, not up; lightening it makes it read as raised and the form turns
+ * inside out.
+ *
+ * Shadows barely register on #121417, so elevation is carried by
+ * `--surface-raised` being visibly lighter than the card, plus a lighter
+ * border. Applying Paper's elevation model here would leave dark looking
+ * flatter than light.
+ *
+ * The part colours are lifted in lightness and eased in chroma, not inverted -
+ * they still have to read as the same eight positions. Type 7 moved furthest
+ * (#9E6A3C to #C08B58): at its Paper value it sinks into the ground and stops
+ * being separable from Type 8 grey. */
+:root[data-theme="slate"] {
+  --ground:        #121417;
+  --surface:       #1A1D21;
+  --surface-sunk:  #141619;
+  --surface-raised:#22262B;
+  --chip:          #23272C;
+  --ink:           #ECEAE5;
+  --ink-2:         #A5ABB3;
+  --ink-3:         #868D96;
+
+  --header:        #0E1013;
+  --header-active: #262B31;
+  --header-line:   #2C3137;
+
+  --line:          #2C3137;
+  --line-soft:     #23272C;
+  --control-line:  #3A4048;
+
+  --accent:        #E08A62;
+  --accent-hover:  #EDA484;
+  --ok:            #6FBFAF;
+  --ok-bg:         #17302E;
+  --warn:          #D9A441;
+  --warn-bg:       #2E2617;
+  --error:         #E0837A;
+  --error-bg:      #331E1C;
+
+  --attention:     #D9A441;
+  --attention-bg:  #2E2617;
+  --attention-bg-2:#3A301D;
+  --unknown-bg:    #26251F;
+  --unknown-fg:    #A8A093;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, .40);
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, .55);
+
+  --wash:        rgba(255, 255, 255, .05);
+  --wash-strong: rgba(255, 255, 255, .09);
+  --accent-wash: rgba(224, 138, 98, .16);
+  --backdrop:    rgba(0, 0, 0, .60);
+
+  --part-1: #7FB3D6;
+  --part-2: #A3CC77;
+  --part-3: #E3D274;
+  --part-4: #E796A7;
+  --part-5: #A98EDA;
+  --part-6: #E0AE63;
+  --part-7: #C08B58;
+  --part-8: #A8A6A1;
+
+  /* the arcs are light pastels here, so the ink stays dark - and so does what
+     sits on the accent, which is a light peach rather than a rust */
+  --on-part:   #16191D;
+  --on-accent: #16191D;
+
+  --badge-1-bg: #23394A; --badge-1-fg: #9FCBE6;
+  --badge-2-bg: #2C3D22; --badge-2-fg: #B9DB92;
+  --badge-3-bg: #3D3720; --badge-3-fg: #EFDE8C;
+  --badge-4-bg: #3F2730; --badge-4-fg: #F0AEBC;
+  --badge-5-bg: #2F2842; --badge-5-fg: #BFA8EA;
+  --badge-6-bg: #3D3120; --badge-6-fg: #EEC98E;
+  --badge-7-bg: #35271A; --badge-7-fg: #D4A272;
+  --badge-8-bg: #2E2E2C; --badge-8-fg: #BCBAB5;
+}
+
+/* The page is `--ground`; only `html` carries it, so an over-scroll on a
+   phone does not reveal white behind a dark page. */
+html { background: var(--ground); color-scheme: light; }
+html[data-theme="slate"] { color-scheme: dark; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -257,6 +382,31 @@ a:hover { color: var(--accent-hover); }
 }
 
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+/* The theme control: icon only, outlined, to the right of the parts count.
+   Three states, so the glyph does not try to depict the current theme - it is
+   a switch, and the state is on the label and the title. */
+.theme-toggle {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--header-line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--on-dark-2);
+  cursor: pointer;
+}
+.theme-toggle svg { width: 16px; height: 16px; }
+.theme-toggle:hover { color: var(--on-dark); border-color: var(--on-dark-3); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* following the system is the default, and reads as the least emphatic state */
+.theme-toggle[data-choice="auto"] { color: var(--on-dark-3); }
+.theme-toggle[data-choice="light"],
+.theme-toggle[data-choice="dark"] { color: var(--on-dark); border-color: var(--header-line); }
 .folder { font-family: var(--font-mono); font-size: 12px; color: var(--on-dark-3); }
 
 /* ----------------------------------------------------------------- panels */
@@ -348,7 +498,7 @@ select:focus-visible, .seg:focus-visible, .btn:focus-visible {
   border: none;
   padding: 0 14px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: var(--on-accent);
   font-weight: 600;
 }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
@@ -514,7 +664,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   border: 1px solid var(--line);
   border-radius: var(--r-control);
   background: var(--surface);
-  box-shadow: 0 10px 28px rgba(20, 23, 26, 0.14);
+  box-shadow: var(--shadow-3);
 }
 @media (max-width: 640px) { .finder-results { left: 16px; right: 16px; } }
 
@@ -605,7 +755,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   background: var(--surface);
   color: var(--ink);
 }
-.sheet::backdrop { background: rgba(20, 23, 26, 0.38); }
+.sheet::backdrop { background: var(--backdrop); }
 
 .sheet-head {
   position: sticky;
@@ -675,3 +825,40 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   color: var(--attention);
 }
 .rx-lead { margin-bottom: 12px; font-size: 12.5px; color: var(--ink-2); }
+
+/* ------------------------------------------------- part colour by type */
+/* The one place a part type becomes a colour.
+ *
+ * It used to be the API: every payload carried `color`, `badge_bg` and
+ * `badge_fg` as literal hex. That works until the page can be themed, and then
+ * it fails in the worst possible way - everything restyles except the ring
+ * arcs and the type badges, which are the only places colour carries meaning.
+ *
+ * So the server sends the part type and this resolves it. `data-part` on an
+ * element exposes three custom properties to it and its descendants, and a
+ * theme switch re-resolves them with no repaint and no JavaScript at all.
+ *
+ * Anything unrecognised, and anything with no type, lands on the unknown pair
+ * rather than on a colour that would imply a position it does not have.
+ */
+
+[data-part] {
+  --part-color: var(--unknown-bg);
+  --badge-bg:   var(--unknown-bg);
+  --badge-fg:   var(--unknown-fg);
+}
+[data-part^="1"] { --part-color: var(--part-1); --badge-bg: var(--badge-1-bg); --badge-fg: var(--badge-1-fg); }
+[data-part^="2"] { --part-color: var(--part-2); --badge-bg: var(--badge-2-bg); --badge-fg: var(--badge-2-fg); }
+[data-part^="3"] { --part-color: var(--part-3); --badge-bg: var(--badge-3-bg); --badge-fg: var(--badge-3-fg); }
+[data-part^="4"] { --part-color: var(--part-4); --badge-bg: var(--badge-4-bg); --badge-fg: var(--badge-4-fg); }
+[data-part^="5"] { --part-color: var(--part-5); --badge-bg: var(--badge-5-bg); --badge-fg: var(--badge-5-fg); }
+[data-part^="6"] { --part-color: var(--part-6); --badge-bg: var(--badge-6-bg); --badge-fg: var(--badge-6-fg); }
+[data-part^="7"] { --part-color: var(--part-7); --badge-bg: var(--badge-7-bg); --badge-fg: var(--badge-7-fg); }
+[data-part^="8"] { --part-color: var(--part-8); --badge-bg: var(--badge-8-bg); --badge-fg: var(--badge-8-fg); }
+
+/* `^=` covers 3a, 4b, 8a and the `r` suffix in one rule each, which is what
+ * `color_for` did in Python by stripping to the leading position. An empty
+ * attribute matches none of them and keeps the unknown pair above. */
+
+.part-fill  { background: var(--part-color); }
+.badge[data-part] { background: var(--badge-bg); color: var(--badge-fg); }

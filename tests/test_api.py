@@ -53,7 +53,6 @@ def test_plasmids_can_be_narrowed_to_a_slot(client):
     body = client.get("/api/library/plasmids", params={"five": "AACG", "three": "TATG"}).json()
     assert [p["name"] for p in body] == ["pTDH3"]
     assert body[0]["part_type"] == "2"
-    assert body[0]["color"].startswith("#")
 
 
 def test_one_plasmid_comes_back_in_full(client):
@@ -88,7 +87,7 @@ def test_slots_come_back_with_their_options(client):
     promoter = next(s for s in body["slots"] if s["key"] == "2")
     assert promoter["column"] == "left"
     assert promoter["five_prime"] == "AACG"
-    assert promoter["badge_bg"].startswith("#")
+    assert "badge_bg" not in promoter, "colour is the front end's job now"
     assert [o["name"] for o in promoter["options"]] == ["pTDH3"]
 
 
@@ -112,7 +111,7 @@ def test_assemble_returns_everything_the_screen_draws(client):
     assert body["counts"]["errors"] == 0
 
     first = body["parts"][0]
-    assert {"start", "end", "color", "part_type", "source_name"} <= set(first)
+    assert {"start", "end", "part_type", "source_name"} <= set(first)
     assert body["parts"][-1]["end"] == body["length"]
     assert all(j["overhang"] and j["upstream"] and j["downstream"] for j in body["junctions"])
 
@@ -264,7 +263,7 @@ def test_types_endpoint_feeds_the_filter_and_the_dialog(client):
     by_name = {t["name"]: t for t in types}
     assert by_name["3"]["count"] == 1
     assert by_name["3"]["description"].startswith("CDS")
-    assert by_name["3"]["badge_bg"].startswith("#")
+    assert "badge_bg" not in by_name["3"], "colour is the front end's job now"
     assert "234" in by_name and "8b" in by_name
 
 
@@ -407,6 +406,52 @@ def test_the_callout_lines_still_ask_to_be_truncated(client):
         assert any("ellipsis" in b for b in blocks), f"{selector} truncates with no sign of it"
 
 
+def test_no_endpoint_sends_a_literal_colour(client):
+    """The other half of the theme rule, checked where it actually matters.
+
+    A hex code in a payload is a colour chosen on the server, and the server
+    has no idea which theme the page is wearing. Tokens are fine - `var(--x)`
+    re-resolves - so the test is about literals, not about the word colour.
+
+    Walked over whole responses rather than named fields: the failure mode is
+    someone adding a new field, and a test that only knew the old names would
+    pass through exactly the mistake it exists to catch.
+    """
+    hex_colour = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+
+    def literals(value, path="") -> list[str]:
+        if isinstance(value, dict):
+            return [b for k, v in value.items() for b in literals(v, f"{path}.{k}")]
+        if isinstance(value, list):
+            return [b for n, v in enumerate(value) for b in literals(v, f"{path}[{n}]")]
+        if isinstance(value, str) and hex_colour.match(value.strip()):
+            return [f"{path} = {value}"]
+        return []
+
+    endpoints = [
+        client.get("/api/library/plasmids"),
+        client.get("/api/library/types"),
+        client.get("/api/library/search", params={"q": "TDH"}),
+        client.get("/api/level2/default"),
+        client.post("/api/level2/assemble", json=design()),
+        client.post("/api/level2/slots", json=design()),
+    ]
+    offences = []
+    for response in endpoints:
+        assert response.status_code == 200, response.text[:200]
+        offences += [f"{response.url.path}{bad}" for bad in literals(response.json())]
+
+    assert not offences, "literal colours in API payloads:\n" + "\n".join(offences)
+
+
+def test_a_part_still_says_what_type_it_is(client):
+    """Removing the colour only works if what replaces it is there."""
+    body = client.post("/api/level2/assemble", json=design()).json()
+    assert body["parts"], "nothing was assembled, so this proves nothing"
+    for part in body["parts"]:
+        assert part.get("part_type"), f"{part['name']} has no part_type to colour by"
+
+
 def _occurrences(text, needle):
     at, out = text.find(needle), []
     while at != -1:
@@ -496,7 +541,7 @@ def test_search_is_a_shared_endpoint_every_screen_can_call(client):
 def test_a_search_hit_carries_everything_a_dropdown_needs(client):
     hit = client.get("/api/library/search", params={"q": CANONICAL["3"]}).json()["hits"][0]
     for key in ("name", "display", "part_type", "length", "where", "matched",
-                "badge_bg", "badge_fg", "in_part", "component_source"):
+                "in_part", "component_source"):
         assert key in hit, f"a hit must carry {key}"
 
 

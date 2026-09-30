@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Sequence
 
+from ..core import cassette as cassette_core
 from ..core import decompose as decompose_core
 from ..core import parttypes
 from ..core.assembly import ERROR, INFO, WARNING, AssemblyResult, Issue, Piece, assemble
@@ -27,28 +28,9 @@ LEFT_POSITIONS = ("1", "2", "3", "4")
 RIGHT_POSITIONS = ("5", "6", "7", "8")
 
 
-@dataclass(frozen=True)
-class Slot:
-    """One dropdown on the Level 2 screen."""
-
-    key: str
-    """The part type this slot takes, e.g. ``3``, ``3a``, ``234``."""
-    five_prime: str
-    three_prime: str
-    column: str
-    """``left`` or ``right``."""
-
-    @property
-    def label(self) -> str:
-        return self.key.replace("234", "2·4").replace("678", "6·8")
-
-    @property
-    def description(self) -> str:
-        return parttypes.DESCRIPTIONS.get(self.key, "composite part")
-
-    @property
-    def overhangs(self) -> tuple[str, str]:
-        return self.five_prime, self.three_prime
+#: One position of the part circle. Defined in `core.cassette` because the
+#: Plate screen builds ninety-six cassettes and may not import this module.
+Slot = cassette_core.Slot
 
 
 @dataclass
@@ -77,29 +59,16 @@ class CassetteDesign:
 
 def slots(design: CassetteDesign, scheme: Scheme = YTK) -> list[Slot]:
     """The active slots, in circle order."""
-    keys: list[str] = ["1"]
-    if design.composite_left:
-        keys.append("234")
-    else:
-        keys.append("2")
-        keys.extend(("3a", "3b") if design.split_3 else ("3",))
-        keys.extend(("4a", "4b") if design.split_4 else ("4",))
-    keys.append("5")
-    if design.composite_right:
-        keys.append("678")
-    else:
-        keys.append("6")
-        keys.append("7")
-        keys.extend(("8a", "8b") if design.split_8 else ("8",))
-
-    out = []
-    for key in keys:
-        pair = parttypes.type_overhangs(key, scheme)
-        if pair is None:
-            continue
-        column = "left" if key in ("1", "2", "234") or key[0] in "34" else "right"
-        out.append(Slot(key=key, five_prime=pair[0], three_prime=pair[1], column=column))
-    return out
+    return cassette_core.slots_for(
+        cassette_core.slot_keys(
+            split_3=design.split_3,
+            split_4=design.split_4,
+            split_8=design.split_8,
+            composite_left=design.composite_left,
+            composite_right=design.composite_right,
+        ),
+        scheme,
+    )
 
 
 def options(library: Library, slot: Slot) -> list[PlasmidEntry]:
@@ -154,56 +123,18 @@ def _preference(entry: PlasmidEntry, slot: Slot, used_connectors: set[str]) -> t
 
 
 def build(library: Library, design: CassetteDesign) -> AssemblyResult:
-    """Resolve the design against the library and simulate the reaction."""
-    scheme = library.scheme
-    active = slots(design, scheme)
-    pieces: list[Piece] = []
-    issues: list[Issue] = []
-    chosen: list[PlasmidEntry] = []
+    """Resolve the design against the library and simulate the reaction.
 
-    for slot in active:
-        name = design.selections.get(slot.key)
-        if not name:
-            issues.append(
-                Issue(ERROR, "empty_slot",
-                      f"slot {slot.label} ({slot.five_prime} -> {slot.three_prime}) is empty")
-            )
-            continue
+    The resolution and the reaction live in `core.cassette`, shared with the
+    Plate screen. What stays here is the advice - screening colour, marker,
+    integration - which is about how this screen reads, not about the kit.
+    """
+    result, chosen = cassette_core.build(
+        library, design.selections, slots(design, library.scheme), name=design.name
+    )
+    if result.product is None and not result.ok:
+        return result
 
-        entry = library.get(name)
-        if entry is None:
-            issues.append(Issue(ERROR, "unknown_part", f"no plasmid named {name} in the library"))
-            continue
-
-        if entry.overhangs != slot.overhangs:
-            issues.append(
-                Issue(ERROR, "wrong_overhangs",
-                      f"{entry.name} releases {entry.call.five_prime} -> "
-                      f"{entry.call.three_prime}, but slot {slot.label} needs "
-                      f"{slot.five_prime} -> {slot.three_prime}")
-            )
-            continue
-
-        if entry.call.reversed_sites:
-            issues.append(
-                Issue(ERROR, "dropout_as_part",
-                      f"{entry.name} is a dropout ({entry.call.part_type}); it is consumed "
-                      f"by the reaction and never ends up in the product")
-            )
-            continue
-
-        try:
-            pieces.append(library.piece(entry))
-        except (ValueError, OSError) as exc:
-            issues.append(Issue(ERROR, "unreadable_part", f"{entry.name}: {exc}"))
-            continue
-        chosen.append(entry)
-
-    if any(i.level == ERROR for i in issues):
-        return AssemblyResult(False, None, issues=issues, enzyme=scheme.part_enzyme.name)
-
-    result = assemble(pieces, scheme.part_enzyme, name=design.name)
-    result.issues = issues + result.issues
     result.issues += _notes(design, chosen)
     result.ok = result.ok and not result.errors
     if not result.ok:

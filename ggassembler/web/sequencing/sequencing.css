@@ -186,7 +186,7 @@ div.verdict,
   transition: transform 120ms ease-out;
 }
 .verdict[open] > summary::before { transform: translateY(-50%) rotate(90deg); }
-.verdict > summary:hover { background: rgba(20, 23, 26, 0.03); }
+.verdict > summary:hover { background: var(--wash); }
 .verdict > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* a plain row carries no chevron, so its text lines up with the ones that do */
 div.verdict { padding-left: 26px; }
@@ -302,7 +302,7 @@ div.verdict { padding-left: 26px; }
   z-index: 1;
   border-left: 1px solid var(--accent);
   border-right: 1px solid var(--accent);
-  background: rgba(184, 92, 56, 0.09);
+  background: var(--accent-wash);
   pointer-events: none;
 }
 

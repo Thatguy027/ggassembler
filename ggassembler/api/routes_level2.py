@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 from ..core.assembly import AssemblyResult
 from ..core.library import Library, remap_features
 from ..core import protocol
-from ..core.parttypes import badge_for, color_for
 from ..core.seqio import write_genbank
 from ..levels import level2_cassette as level2
 
@@ -55,7 +54,6 @@ def _slot_payload(library: Library, design: level2.CassetteDesign) -> list[dict[
     out = []
     for slot in level2.slots(design, library.scheme):
         options = level2.options(library, slot)
-        badge_bg, badge_fg = badge_for(slot.key, library.scheme)
         out.append(
             {
                 "key": slot.key,
@@ -64,9 +62,6 @@ def _slot_payload(library: Library, design: level2.CassetteDesign) -> list[dict[
                 "description": slot.description,
                 "five_prime": slot.five_prime,
                 "three_prime": slot.three_prime,
-                "color": color_for(slot.key, library.scheme),
-                "badge_bg": badge_bg,
-                "badge_fg": badge_fg,
                 "selected": design.selections.get(slot.key),
                 "match_count": len(options),
                 "options": [
@@ -143,7 +138,6 @@ def _result_payload(
                 "length": p.length,
                 "left_overhang": p.left_overhang,
                 "right_overhang": p.right_overhang,
-                "color": p.color,
                 "features": _part_features(library, p) if library else [],
             }
             for p in result.parts

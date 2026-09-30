@@ -1,0 +1,389 @@
+/* Plate.
+ *
+ * Every colour is a token, so both themes follow. The well fill in particular
+ * is `--part-color` resolved from `data-part`, which means a source plate is
+ * also a picture of which part types you actually keep on the shelf.
+ */
+
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 480px);
+  gap: 16px;
+  padding: 16px 24px;
+  align-items: start;
+}
+@media (max-width: 1100px) { .board { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .board { padding: 12px 16px; } }
+
+.placeholder {
+  padding: 22px 4px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------- the grid */
+
+/* Row labels down the left, column numbers across the top, and the wells in
+   the corner they make. A grid rather than a table: the cells are controls. */
+.plate-wrap {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-rows: 14px auto;
+  gap: 3px;
+  align-items: center;
+}
+.plate-cols {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 3px;
+}
+.plate-cols span {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}
+.plate-rows {
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+  gap: 3px;
+  height: 100%;
+}
+.plate-rows span {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 3px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}
+.plate-grid {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.well {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 20px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--control-line);
+  border-radius: 50%;
+  background: var(--surface-sunk);
+  cursor: pointer;
+}
+.well:hover { border-color: var(--ink-2); }
+.well:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 1; }
+.well.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-wash); }
+
+/* an empty well is drawn, not merely absent - a plate with a gap in column 7
+   is a different thing from a plate that stops at column 6 */
+.well.is-empty { border-style: dashed; background: transparent; }
+
+/* Volume as a fill from the bottom. Colour comes from the part type, so the
+   plate doubles as a picture of what kind of parts you keep. */
+.well-fill {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: var(--part-color, var(--unknown-bg));
+  pointer-events: none;
+}
+
+.well.is-low { border-color: var(--attention); background: var(--attention-bg); }
+.well.is-bad { border-color: var(--error); background: var(--error-bg); }
+/* never colour alone: a well that cannot be used carries a mark as well */
+.well.is-low::after,
+.well.is-bad::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 7px; height: 1.6px;
+  background: var(--error);
+  transform: rotate(-45deg);
+}
+.well.is-low::after { background: var(--attention); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--ink-3); }
+.legend span { display: flex; align-items: center; gap: 5px; }
+.key {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 1px solid var(--control-line);
+  background: var(--surface-sunk);
+}
+.key-filled { background: var(--part-3); border-color: var(--part-3); }
+.key-low { border-color: var(--attention); background: var(--attention-bg); }
+.key-bad { border-color: var(--error); background: var(--error-bg); }
+.key-empty { border-style: dashed; background: transparent; }
+
+/* ----------------------------------------------------------- the editor */
+
+.well-editor {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.editor-head { display: flex; align-items: baseline; gap: 10px; }
+.editor-head b { font-family: var(--font-mono); font-size: 14px; }
+.editor-head .card-note { flex-grow: 1; }
+.editor-head .btn { height: var(--h-seg); font-size: 12px; }
+
+.editor-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.editor-fields .field { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
+.editor-fields .field.narrow { flex-grow: 0; width: 96px; }
+.editor-fields input { width: 100%; }
+.editor-fields .btn { flex-shrink: 0; }
+
+/* --------------------------------------------------------- the well list */
+
+.well-list { list-style: none; display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+.well-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 5px 8px;
+  border-left: 3px solid transparent;
+  border-radius: 0 var(--r-chip) var(--r-chip) 0;
+  background: var(--surface-sunk);
+  cursor: pointer;
+}
+.well-row:hover { background: var(--chip); }
+.well-row b { font-family: var(--font-mono); font-size: 11.5px; }
+.w-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-num { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.w-why { grid-column: 2 / -1; font-size: 11px; color: var(--ink-3); }
+.well-row.is-low { border-left-color: var(--attention); background: var(--attention-bg); }
+.well-row.is-low .w-why { color: var(--attention); }
+.well-row.is-bad { border-left-color: var(--error); background: var(--error-bg); }
+.well-row.is-bad .w-why { color: var(--error); }
+
+/* ------------------------------------------------------------- settings */
+
+.plate-settings { font-size: 12px; }
+.plate-settings > summary {
+  padding: 4px 2px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+}
+.plate-settings > summary::-webkit-details-marker { display: none; }
+.plate-settings > summary:hover { color: var(--accent); }
+.settings-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding-top: 6px; }
+.settings-fields .field { display: flex; flex-direction: column; gap: 3px; }
+.settings-fields .field.grow { flex-grow: 1; min-width: 160px; }
+.settings-fields .field.narrow { width: 110px; }
+.settings-fields input { width: 100%; }
+
+.plate-issues { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.issue {
+  padding: 6px 9px;
+  border-left: 3px solid var(--line);
+  border-radius: 0 var(--r-chip) var(--r-chip) 0;
+  background: var(--surface-sunk);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.issue.is-error { border-left-color: var(--error); background: var(--error-bg); color: var(--error); }
+.issue.is-warning { border-left-color: var(--attention); background: var(--attention-bg); color: var(--attention); }
+.issue.is-info { border-left-color: var(--ok); background: var(--ok-bg); color: var(--ok); }
+
+.status { padding: 0 24px 24px; font-size: 12px; color: var(--ink-2); }
+.status.is-bad { color: var(--error); }
+
+/* ------------------------------------------------------- the design panel */
+
+.factor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 760px) { .factor-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.factor { display: flex; flex-direction: column; gap: 6px; }
+.factor-head { display: flex; align-items: center; gap: 8px; }
+.factor-head .lbl { margin: 0; }
+
+.picks { display: flex; flex-wrap: wrap; gap: 4px; max-height: 128px; overflow-y: auto; }
+.picks-count { width: 100%; }
+.pick {
+  padding: 3px 8px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-pill);
+  background: var(--surface-sunk);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pick:hover { border-color: var(--ink-2); color: var(--ink); }
+.pick.is-on { border-color: var(--accent); background: var(--accent-wash); color: var(--ink); font-weight: 500; }
+.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.naming { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.naming .field { display: flex; flex-direction: column; gap: 3px; }
+.naming .field.grow { flex-grow: 1; min-width: 140px; }
+.naming input { width: 100%; font-family: var(--font-mono); font-size: 12px; }
+#pattern-preview { width: 100%; font-family: var(--font-mono); }
+
+/* The blocking reason sits above the grid, not in a toast: it is the answer
+   to "why is Generate greyed out", and that is asked while looking here. */
+.blocker {
+  padding: 9px 11px;
+  border: 1px solid var(--error);
+  border-radius: var(--r-control);
+  background: var(--error-bg);
+  font-size: 12.5px;
+  color: var(--error);
+}
+
+/* ---------------------------------------------------- destination grid */
+
+.plate-wrap.dest { grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: 58px auto; }
+.dest-cols { grid-column: 2; display: grid; gap: 4px; align-items: end; height: 58px; }
+.dest-rows { grid-row: 2; display: grid; gap: 4px; height: 100%; }
+.dest-grid { grid-column: 2; grid-row: 2; gap: 4px; }
+
+/* Twelve variant names will not fit horizontally at 40px a column, and cutting
+   them to three characters makes the grid useless - so they are turned. */
+.axis-label {
+  transform: rotate(-58deg);
+  transform-origin: left bottom;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  align-self: end;
+  padding-left: 2px;
+  border-left: 3px solid var(--badge-bg, var(--line));
+}
+.axis-label.is-flagged { color: var(--error); font-weight: 600; }
+
+.axis-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding-right: 4px;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  border-right: 3px solid var(--badge-bg, var(--line));
+  white-space: nowrap;
+  overflow: hidden;
+}
+.axis-row span { overflow: hidden; text-overflow: ellipsis; }
+.axis-row b { font-family: var(--font-mono); color: var(--ink-3); flex-shrink: 0; }
+.axis-row.is-flagged { color: var(--error); font-weight: 600; }
+
+.dest-well {
+  position: relative;
+  min-height: 40px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-chip);
+  background: var(--surface-sunk);
+  cursor: pointer;
+}
+.dest-well:hover { border-color: var(--ink-2); }
+.dest-well:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 1; }
+/* a clean well is quiet on purpose: what you scan a 96-grid for is the four
+   that failed, not the ninety-two that did not */
+.dest-well.is-ok { }
+.dest-well.is-warn { background: var(--attention-bg); border-color: var(--attention); }
+.dest-well.is-err { background: var(--error-bg); border-color: var(--error); }
+.dest-well.is-empty { border-style: dashed; background: transparent; cursor: default; }
+
+.glyph {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  font-style: normal;
+}
+.glyph-warn { color: var(--attention); }
+.glyph-err { color: var(--error); }
+
+.strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chip {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--chip);
+  color: var(--ink-2);
+}
+.chip-ok { background: var(--ok-bg); color: var(--ok); }
+.chip-warn { background: var(--attention-bg); color: var(--attention); }
+.chip-err { background: var(--error-bg); color: var(--error); }
+
+.well-detail {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.detail-head { display: flex; align-items: baseline; gap: 10px; }
+.detail-head b { font-family: var(--font-mono); font-size: 13px; }
+.detail-head span:nth-child(2) { flex-grow: 1; font-size: 12.5px; }
+.detail-parts { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.detail-parts li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.detail-parts .badge { width: 30px; height: 20px; font-size: 10.5px; }
+.detail-parts li > span:nth-child(2) { flex-grow: 1; font-family: var(--font-mono); font-size: 11.5px; }
+
+.actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ------------------------------------------------------- the protocol */
+
+.protocol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+.protocol-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.protocol-head .card-note { flex-grow: 1; min-width: 0; }
+.protocol-head .btn { height: var(--h-seg); font-size: 12px; }
+
+.sim {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--chip);
+  color: var(--ink-2);
+}
+.sim-passed { background: var(--ok-bg); color: var(--ok); }
+.sim-failed { background: var(--error-bg); color: var(--error); }
+/* "not simulated" is its own state, and deliberately not a pass */
+.sim-not-simulated { background: var(--attention-bg); color: var(--attention); }
+
+.protocol-source {
+  max-height: 300px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: var(--r-chip);
+  background: var(--surface-sunk);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plate</title>
+  <script>
+  /* Theme. Inline, and before the stylesheet, on purpose.
+   *
+   * A deferred script would set `data-theme` after the first paint, so every
+   * load of a dark page flashes white first. There is no way to fix that from
+   * an external file, which is also why this is duplicated across the screens
+   * rather than shared: `tokens.css` is the only file web/ may share, and a
+   * theme that arrives over the network is a theme that arrives too late.
+   * `tests/test_theme.py` asserts the copies stay identical.
+   *
+   * Three choices - auto, light, dark - and two themes. `auto` follows the OS
+   * and keeps following it while the page is open. Every localStorage call is
+   * wrapped: in a private window it throws rather than returning nothing, and
+   * a colour scheme is not worth a broken page.
+   */
+  (function () {
+    var KEY = 'ggasm-theme';
+    var ORDER = ['auto', 'light', 'dark'];
+    var LABEL = { auto: 'Theme: follows your system', light: 'Theme: light', dark: 'Theme: dark' };
+
+    function stored() {
+      try {
+        var value = localStorage.getItem(KEY);
+        return ORDER.indexOf(value) === -1 ? 'auto' : value;
+      } catch (e) { return 'auto'; }
+    }
+    function prefersDark() {
+      try { return window.matchMedia('(prefers-color-scheme: dark)').matches; }
+      catch (e) { return false; }
+    }
+    function apply(choice) {
+      var dark = choice === 'dark' || (choice === 'auto' && prefersDark());
+      var root = document.documentElement;
+      if (dark) root.setAttribute('data-theme', 'slate');
+      else root.removeAttribute('data-theme');
+      return dark ? 'slate' : 'paper';
+    }
+
+    var choice = stored();
+    var theme = apply(choice);
+
+    function announce() {
+      document.dispatchEvent(new CustomEvent('themechange', {
+        detail: { choice: choice, theme: theme },
+      }));
+    }
+
+    window.ggasmTheme = {
+      choice: function () { return choice; },
+      theme: function () { return theme; },
+      set: function (next) {
+        choice = ORDER.indexOf(next) === -1 ? 'auto' : next;
+        try { localStorage.setItem(KEY, choice); } catch (e) { /* private window */ }
+        theme = apply(choice);
+        announce();
+        return theme;
+      },
+    };
+
+    try {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+        if (choice !== 'auto') return;
+        theme = apply(choice);
+        announce();
+      });
+    } catch (e) { /* older Safari: auto is then fixed at load */ }
+
+    /* The control. Built here rather than in each page's markup so there is
+       one copy of it, in the same place as the logic it drives. */
+    function mount() {
+      var host = document.querySelector('.topbar-right');
+      if (!host || host.querySelector('.theme-toggle')) return;
+
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'theme-toggle';
+
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 16 16');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('focusable', 'false');
+      var ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.setAttribute('cx', '8'); ring.setAttribute('cy', '8'); ring.setAttribute('r', '5.5');
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', 'currentColor');
+      ring.setAttribute('stroke-width', '1.3');
+      /* the filled half: a half-disc, which is the whole glyph */
+      var half = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      half.setAttribute('d', 'M8 2.5a5.5 5.5 0 0 1 0 11z');
+      half.setAttribute('fill', 'currentColor');
+      svg.appendChild(ring); svg.appendChild(half);
+      button.appendChild(svg);
+
+      function label() {
+        button.setAttribute('aria-label', LABEL[choice] + ' - click to change');
+        button.title = LABEL[choice];
+        button.setAttribute('data-choice', choice);
+      }
+      label();
+      button.addEventListener('click', function () {
+        window.ggasmTheme.set(ORDER[(ORDER.indexOf(choice) + 1) % ORDER.length]);
+        label();
+      });
+      host.appendChild(button);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', mount);
+    } else {
+      mount();
+    }
+  })();
+  </script>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/plate/plate.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark"></span><span class="brand-name">GG Assembler</span></div>
+      <nav class="tabs">
+        <a class="tab" href="/part">Part plasmid</a>
+        <a class="tab" href="/">Cassette</a>
+        <a class="tab" href="/multigene">Multigene</a>
+        <a class="tab" href="/library">Library</a>
+        <a class="tab" href="/proteins">Proteins</a>
+        <a class="tab" href="/sequencing">Sequencing</a>
+        <a class="tab" href="/plate" aria-current="page">Plate</a>
+      </nav>
+      <div class="topbar-right"><span class="folder" id="folder">&nbsp;</span></div>
+    </header>
+
+    <div class="page-guide">
+      <details class="guide">
+        <summary>The standing source plate: what is in each well, how concentrated it is, and how much is left.</summary>
+        <div class="guide-body">
+        <span>This is a <b>physical object on a shelf</b>, not a description of one run. Nobody re-racks eight plasmids before every build &mdash; you keep a normalized working plate and draw from it, so the app keeps its own record of what is in yours.</span>
+        <span><b>Concentration enters the data model here.</b> A GenBank file records a sequence, not how much of it is in your freezer, and the fmol maths needs both. A well may override the library&rsquo;s measured value, because the same plasmid diluted into two wells is two numbers.</span>
+        <span><b>Volume is tracked across runs.</b> A sweep draws from a connector well ninety-six times. Running dry at column 9 is not something worth discovering at the plate reader, so a run is checked against what is left before it starts.</span>
+        <span>Wells naming a plasmid the library no longer has are <b>flagged on load</b>. A plate is edited over weeks and the index is rebuilt under it.</span>
+        </div>
+      </details>
+    </div>
+
+    <div class="board">
+      <section class="card pad">
+        <div class="card-head">
+          <span class="card-title">Sweep</span>
+          <span class="card-note" id="sweep-note">one base cassette, one or two positions varying</span>
+        </div>
+
+        <div class="factor-grid">
+          <div class="factor" id="factor-row">
+            <div class="factor-head">
+              <span class="badge" id="row-badge" data-part="">&mdash;</span>
+              <label class="lbl" for="row-position">Down the rows (A&ndash;H, up to 8)</label>
+            </div>
+            <select id="row-position"></select>
+            <div class="picks" id="row-picks"></div>
+          </div>
+
+          <div class="factor" id="factor-col">
+            <div class="factor-head">
+              <span class="badge" id="col-badge" data-part="">&mdash;</span>
+              <label class="lbl" for="col-position">Across the columns (1&ndash;12, up to 12)</label>
+            </div>
+            <select id="col-position"></select>
+            <div class="picks" id="col-picks"></div>
+          </div>
+        </div>
+
+        <div class="naming">
+          <div class="field grow">
+            <label class="lbl" for="sweep-name">Base name</label>
+            <input id="sweep-name" type="text" spellcheck="false" value="SWEEP">
+          </div>
+          <div class="field grow">
+            <label class="lbl" for="sweep-pattern">Naming pattern</label>
+            <input id="sweep-pattern" type="text" spellcheck="false" value="{base}_{row}_{col}">
+          </div>
+          <span class="card-note" id="pattern-preview">&nbsp;</span>
+        </div>
+
+        <div class="blocker" id="blocker" hidden></div>
+
+        <div class="plate-wrap dest">
+          <div class="dest-cols" id="dest-cols" aria-hidden="true"></div>
+          <div class="plate-rows dest-rows" id="dest-rows" aria-hidden="true"></div>
+          <div class="plate-grid dest-grid" id="dest-grid" role="grid"
+               aria-label="Destination plate, 8 rows by 12 columns"></div>
+        </div>
+
+        <div class="strip" id="strip"></div>
+
+        <div class="well-detail" id="well-detail" hidden></div>
+
+        <div class="actions">
+          <button class="btn" type="button" id="map-csv" disabled>Plate map CSV</button>
+          <button class="btn" type="button" id="products" disabled>Predicted plasmids</button>
+          <button class="btn" type="button" id="revalidate">Re-check</button>
+          <button class="btn btn-primary" type="button" id="generate" disabled>Generate protocol</button>
+        </div>
+
+        <div class="protocol" id="protocol" hidden>
+          <div class="protocol-head">
+            <span class="sim" id="sim-verdict"></span>
+            <span class="card-note" id="sim-detail"></span>
+            <button class="btn" type="button" id="download" disabled>Download protocol.py</button>
+            <button class="btn" type="button" id="commit" disabled>Mark as run</button>
+          </div>
+          <pre class="protocol-source" id="protocol-source"></pre>
+        </div>
+      </section>
+
+      <section class="card pad">
+        <div class="card-head">
+          <span class="card-title">Source plate</span>
+          <span class="card-note" id="source-note"></span>
+        </div>
+
+        <div class="plate-wrap">
+          <div class="plate-cols" id="source-cols" aria-hidden="true"></div>
+          <div class="plate-rows" id="source-rows" aria-hidden="true"></div>
+          <div class="plate-grid" id="source-grid" role="grid"
+               aria-label="Source plate, 8 rows by 12 columns"></div>
+        </div>
+
+        <div class="legend">
+          <span><i class="key key-filled"></i> volume remaining</span>
+          <span><i class="key key-low"></i> at or below dead volume</span>
+          <span><i class="key key-bad"></i> not in the library</span>
+          <span><i class="key key-empty"></i> empty</span>
+        </div>
+
+        <div class="well-editor" id="editor" hidden>
+          <div class="editor-head">
+            <b id="editor-well">A1</b>
+            <span class="card-note" id="editor-what"></span>
+            <button class="btn" type="button" id="editor-clear">Empty this well</button>
+          </div>
+          <div class="editor-fields">
+            <div class="field">
+              <label class="lbl" for="e-plasmid">Plasmid</label>
+              <input id="e-plasmid" type="search" list="plasmid-list" spellcheck="false"
+                     placeholder="Name from the library&hellip;">
+              <datalist id="plasmid-list"></datalist>
+            </div>
+            <div class="field narrow">
+              <label class="lbl" for="e-conc">ng/&micro;L</label>
+              <input id="e-conc" type="number" min="0" step="0.1">
+            </div>
+            <div class="field narrow">
+              <label class="lbl" for="e-volume">&micro;L in well</label>
+              <input id="e-volume" type="number" min="0" step="1">
+            </div>
+            <button class="btn btn-primary" type="button" id="editor-save">Save well</button>
+          </div>
+          <span class="card-note" id="editor-note">&nbsp;</span>
+        </div>
+
+        <ul class="well-list" id="well-list"></ul>
+
+        <details class="plate-settings">
+          <summary>Plate settings</summary>
+          <div class="settings-fields">
+            <div class="field">
+              <label class="lbl" for="p-id">Plate id</label>
+              <input id="p-id" type="text" spellcheck="false">
+            </div>
+            <div class="field grow">
+              <label class="lbl" for="p-labware">Opentrons labware</label>
+              <input id="p-labware" type="text" spellcheck="false">
+            </div>
+            <div class="field narrow">
+              <label class="lbl" for="p-dead">Dead volume &micro;L</label>
+              <input id="p-dead" type="number" min="0" step="0.5">
+            </div>
+            <button class="btn" type="button" id="settings-save">Save</button>
+          </div>
+        </details>
+
+        <ul class="plate-issues" id="plate-issues"></ul>
+      </section>
+    </div>
+
+    <p class="status" id="status"></p>
+  </div>
+
+  <script type="module" src="/static/plate/plate.js"></script>
+</body>
+</html>

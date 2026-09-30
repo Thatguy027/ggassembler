@@ -86,7 +86,7 @@
 .index-table tbody tr:hover td { background: var(--bg); }
 
 .index-table tr.attention td { background: var(--attention-bg); }
-.index-table tr.attention:hover td { background: #F7EDD8; }
+.index-table tr.attention:hover td { background: var(--attention-bg-2); }
 
 .cell-mono { font-family: var(--font-mono); font-size: 12px; }
 .cell-dim { color: var(--ink-3); }
@@ -95,7 +95,12 @@
 .cell-alias { display: block; font-size: 11px; color: var(--ink-3); }
 .cell-component { font-size: 12px; }
 
+/* colour comes from `data-part` via tokens.css, so a theme switch re-resolves
+   it; the fallback pair is the one for a plasmid with no type at all, which is
+   most of this column */
 .type-pill {
+  background: var(--badge-bg, var(--unknown-bg));
+  color: var(--badge-fg, var(--unknown-fg));
   display: inline-block;
   font-family: var(--font-display);
   font-weight: 700;
@@ -127,7 +132,7 @@
   color: var(--ink);
   width: min(420px, calc(100vw - 32px));
 }
-.assign::backdrop { background: rgba(20, 23, 26, 0.35); }
+.assign::backdrop { background: var(--backdrop); }
 .assign form { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 8px; }
 .assign-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; }
 .assign-label {
