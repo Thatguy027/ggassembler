@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ..core.library import Library
 from ..core.parttypes import YTK, Scheme
-from . import routes_level1, routes_level2, routes_level3, routes_library
+from . import routes_level1, routes_level2, routes_level3, routes_library, routes_uniprot
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -27,6 +27,7 @@ SCREENS = {
     "/part": "level1",
     "/multigene": "level3",
     "/library": "library",
+    "/proteins": "uniprot",
 }
 
 
@@ -44,6 +45,7 @@ def create_app(
     app.state.library = library
 
     app.include_router(routes_library.router)
+    app.include_router(routes_uniprot.router)
     app.include_router(routes_level2.router)
 
     # Level 1 and Level 3 come online when their routers exist; until then the

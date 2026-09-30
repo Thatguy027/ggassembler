@@ -1,0 +1,83 @@
+/* The Proteins screen. Layout only; everything else comes from tokens.css. */
+
+.board { flex-grow: 1; padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px; }
+.card.pad { padding: 16px; }
+
+.find { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.find .finder-input { flex-grow: 1; }
+.find .lbl { flex-shrink: 0; }
+.find select {
+  height: var(--h-control);
+  padding: 0 8px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+#status.is-bad { color: var(--error); }
+
+.results { margin-top: 10px; display: flex; flex-direction: column; }
+.result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.result:first-child { border-top: 0; }
+.result:hover { background: var(--chip); }
+.result:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.result-what { flex-grow: 1; min-width: 0; }
+.result-name {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.result-meta {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pill.is-reviewed { background: var(--ok-bg); color: var(--ok); }
+
+.sum-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12.5px;
+}
+.sum-row > span:first-child { min-width: 150px; color: var(--ink-2); }
+.sum-row .card-note { margin-left: auto; text-align: right; }
+
+.dna {
+  margin: 12px 0 0;
+  padding: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  white-space: pre;
+}
