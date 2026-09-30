@@ -185,6 +185,60 @@ def test_the_library_screen_uses_only_shared_endpoints():
     assert not offences, "library screen reached into a level:\n" + "\n".join(offences)
 
 
+def test_the_sequencing_screen_uses_only_its_own_and_shared_endpoints():
+    """Not a level either: it checks clones, it does not design anything.
+
+    It may reach `/api/library*`, which is the shared surface every screen is
+    allowed - that is how it wears the same search box as the others - but
+    never a level's own endpoints.
+    """
+    offences = []
+    api_re = re.compile(r"""['"`](/api/[A-Za-z0-9_\-/{}$.]*)""")
+    for path in sorted((WEB / "sequencing").rglob("*.js")):
+        for url in api_re.findall(path.read_text(encoding="utf-8")):
+            if url.startswith("/api/sequencing") or url.startswith("/api/library"):
+                continue
+            offences.append(f"web/sequencing/{path.name}: calls {url}")
+    assert not offences, "sequencing screen reached outside its own API:\n" + "\n".join(offences)
+
+
+def test_the_sequencing_finder_withholds_nothing():
+    """Every other screen scopes the search; this one must not.
+
+    On the Cassette and Multigene screens a hit has to fit a slot or close a
+    chain, so `usable=` withholds the ones that cannot. Here a reference is
+    compared against rather than assembled with, and anything with a sequence
+    is a legitimate thing to have sequenced - including the finished construct
+    those screens deliberately hide. Adding a scope here would hide the very
+    plasmid the person sent off, so its absence is asserted rather than left
+    to be tidied up by someone matching the other screens.
+    """
+    script = (WEB / "sequencing" / "sequencing.js").read_text(encoding="utf-8")
+    # the URL, not the word: the module explains this choice in a comment, and
+    # a test that searched the whole file would match its own explanation -
+    # which has caught me out on this repo before
+    urls = re.findall(r"/api/library/search\?[^`'\"\s]*", script)
+    assert urls, "the sequencing screen lost its search box"
+    assert not any("usable" in url for url in urls), \
+        f"the sequencing search must not withhold anything: {urls}"
+
+
+def test_the_alignment_viewer_does_not_render_every_column_at_once():
+    """A 12 kb construct across eight clones is over a hundred thousand cells.
+
+    Guarded rather than measured, like the library table: the obvious edit -
+    drawing the whole width once and letting the browser scroll it - looks
+    simpler and is what turns the screen into a frozen tab. Two things have to
+    survive: a window on the columns, and runs instead of one span per base.
+    """
+    viewer = (WEB / "sequencing" / "sequencing.js").read_text(encoding="utf-8")
+    columns = (WEB / "sequencing" / "columns.js").read_text(encoding="utf-8")
+    assert "scrollLeft" in viewer, "the whole alignment is not windowed on scroll"
+    assert re.search(r"viewer\.onscroll\s*=\s*paint", viewer), "nothing repaints on scroll"
+    assert "clientWidth" in viewer, "the window is not sized to what is on screen"
+    assert "export function runs" in columns, "cells are no longer merged into runs"
+
+
 def test_web_levels_fetch_only_their_own_endpoints():
     offences = []
     api_re = re.compile(r"""['"`](/api/[A-Za-z0-9_\-/{}$.]*)""")
@@ -240,7 +294,7 @@ def test_the_finder_is_wired_on_the_screens_that_offer_it():
     screen looking finished and doing nothing.
     """
     offences = []
-    for own in ("level2", "level3"):
+    for own in ("level2", "level3", "sequencing"):
         html = (WEB / own / "index.html").read_text(encoding="utf-8")
         if 'id="finder-input"' not in html:
             offences.append(f"web/{own}/index.html: no search box")
@@ -255,7 +309,13 @@ def test_the_finder_is_wired_on_the_screens_that_offer_it():
 
 
 def test_the_finder_asks_before_it_changes_the_design():
-    """Picking a result must offer a confirm step, not silently fill a slot."""
+    """Picking a result must offer a confirm step, not silently fill a slot.
+
+    The two design screens only. The Sequencing screen is deliberately not in
+    this list: there a hit selects a reference to compare against, which is one
+    click to change and overwrites no work, so asking first would be friction
+    guarding against nothing.
+    """
     offences = []
     for own in ("level2", "level3"):
         script = (WEB / own / f"{own}.js").read_text(encoding="utf-8")

@@ -373,6 +373,8 @@ def export(request: Request, body: DesignRequest) -> PlainTextResponse:
         length=result.assembly.length,
         issues=sorted({i.code for i in result.issues if i.level != "info"}),
     )
+    # kept for the Sequencing screen to check clones against later
+    library.remember_expected(design.name, result.assembly.product, level="level3")
     return PlainTextResponse(
         handle.getvalue(),
         headers={"Content-Disposition": f'attachment; filename="{body.name}.gb"'},

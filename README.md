@@ -5,9 +5,9 @@ Toolkit (YTK) standard of Lee, DeLoache, Cervantes & Dueber, *ACS Synth. Biol.*
 2015.
 
 Point it at a folder of GenBank files. It works out what each plasmid **is** by
-simulating the restriction digest, then drives five screens: part construction,
-cassette assembly, multigene assembly, a library index, and a protein search
-that writes a gene you can order.
+simulating the restriction digest, then drives six screens: part construction,
+cassette assembly, multigene assembly, a library index, a protein search that
+writes a gene you can order, and a check of what came back from sequencing.
 
 ```sh
 uv sync
@@ -86,6 +86,17 @@ keep out, defaulting to the scheme's own. Unticking one is a real choice: if
 the part will never meet that enzyme, avoiding it is not worth a run of rare
 codons. The result is a gene to order, not the organism's own sequence.
 
+**Sequencing** — the clones a vendor sent back, checked against the plasmid
+they were meant to be. A whole-plasmid read starts at an arbitrary base and is
+as often as not on the opposite strand; neither is a difference, so each clone
+is *placed* first — shared k-mers vote on a diagonal, and both circles are then
+cut inside a shared exact match so the join cannot invent an indel that no
+clone carries. What is left is read off base by base and named by the feature
+it lands in. A clone that is not this plasmid is said to be unplaced rather
+than aligned into a wall of false mismatches. Constructs exported from the
+Cassette and Multigene screens are kept as references, so a design made today
+can be checked against reads that arrive next week.
+
 ## What it will not do
 
 - **Guess.** A part that cannot be read is reported as unreadable; a stretch of
@@ -95,6 +106,10 @@ codons. The result is a gene to order, not the organism's own sequence.
   on the row rather than presenting the volume as a measurement.
 - **Silently domesticate.** Removing an internal site changes the sequence you
   will order, so it is always a choice.
+- **Align something that is not the plasmid.** A sequencing result that shares
+  no stretch with the reference is reported as unplaced. Forcing it through a
+  global alignment would produce thousands of mismatches and bury the one
+  clone that is genuinely wrong by a single base.
 
 ## Command line
 
@@ -117,7 +132,7 @@ is a hook people disable in a week.
 ```
 ggassembler/
   core/     enzymes, the part circle, the library index, assembly, search,
-            decomposition, protocol, codons, UniProt
+            decomposition, protocol, codons, UniProt, alignment
   levels/   one module per assembly level; levels never import each other
   api/      FastAPI; routes_levelN touches only levels/levelN_* and core
   web/      static front end, one self-contained directory per screen
@@ -132,16 +147,19 @@ file. Work that both levels need — reading a construct back into parts, for
 instance — goes to `core/` rather than being imported sideways or duplicated.
 
 The front end is vanilla ES modules and plain CSS with no build step. Only
-`tokens.css` is shared between screens. The map's geometry and its label
-collision pass live in `web/level2/layout.js` with no DOM in them, so they are
-tested directly under node — the rule that separates two crowded labels without
-letting their leader lines cross is easy to get subtly wrong and impossible to
-eyeball.
+`tokens.css` is shared between screens. Two pieces of arithmetic are kept in
+files with no DOM in them and run directly under node, because both are easy to
+get subtly wrong and impossible to eyeball: `web/level2/layout.js`, the rule
+that separates two crowded map labels without letting their leader lines cross,
+and `web/sequencing/columns.js`, the mapping between a screen column and a
+reference base — which drifts by however many bases the clones before it
+inserted, and when it is wrong nothing looks broken; every label just points a
+few bases off.
 
 ## Test
 
 ```sh
-uv run pytest        # 599 tests
+uv run pytest        # 660 tests
 ```
 
 Several exist because of a specific bug and say so. A few examples: an
@@ -149,8 +167,9 @@ annealing region must exist on its own template (a convention base placed in
 the annealing region instead of the tail matched 1,581 bp upstream and would
 have amplified a wrong product that looked fine); a button in the markup must
 have a real handler; no stylesheet may be sized in pixels where the layout
-scales; and `ConR1` closing one unit must be the same overhang as `ConL1`
-opening the next.
+scales; `ConR1` closing one unit must be the same overhang as `ConL1` opening
+the next; and a sequencing result rotated to start at every one of six
+different bases must still come back with no differences at all.
 
 ## Schemes
 

@@ -1,0 +1,350 @@
+/* Sequencing screen.
+ *
+ * Every colour is a token. The three kinds of difference keep one hue each
+ * wherever they appear - the tick on the overview, the bullet in the verdict
+ * list and the highlighted base in the alignment are the same event, and being
+ * able to follow it by colour is the whole point of showing it three ways.
+ */
+
+:root {
+  --sub:     var(--error);
+  --sub-bg:  var(--error-bg);
+  --del:     var(--attention);
+  --del-bg:  var(--attention-bg);
+  --ins:     var(--ok);
+  --ins-bg:  var(--ok-bg);
+  --ch:      8px;            /* measured at load; this is only a first guess */
+  --aln-name: 190px;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px 24px;
+  align-items: start;
+}
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 24px 24px;
+}
+@media (max-width: 860px) {
+  .board { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
+  .report { padding: 0 16px 16px; }
+}
+
+.setup { min-height: 260px; }
+
+/* ------------------------------------------------------------ the pickers */
+
+/* The shared .finder is built as a full-width strip across the top of a page.
+ * Here it sits inside a card, so the padding and the offsets the dropdown
+ * hangs from are the page's gutters rather than anything it can keep. */
+.finder-inline { padding: 0; margin-bottom: 8px; }
+.finder-inline .finder-results {
+  left: 0;
+  right: 0;
+  top: calc(var(--h-control) + 5px);
+  max-height: 46vh;
+}
+
+#reference {
+  width: 100%;
+  height: auto;
+  padding: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+#reference option { padding: 3px 6px; border-radius: var(--r-chip); }
+
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 18px 14px;
+  border: 1px dashed var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+  text-align: center;
+  cursor: pointer;
+}
+.drop-big { padding: 28px 14px; }
+.drop:hover, .drop.is-over { border-color: var(--accent); background: var(--chip); }
+.drop input[type='file'] { display: none; }
+.drop-line { font-size: 13px; color: var(--ink); }
+.drop-note { font-size: 11.5px; color: var(--ink-3); }
+
+/* "or paste a sequence" - a native <details>, like the guide strip and the
+ * clone rows, so it opens with the keyboard and needs no script of its own. */
+.paste { font-size: 12px; }
+.paste > summary {
+  padding: 4px 2px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+}
+.paste > summary::-webkit-details-marker { display: none; }
+.paste > summary:hover { color: var(--accent); text-decoration-color: currentColor; }
+.paste > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.paste-body { display: flex; flex-direction: column; gap: 6px; padding: 6px 0 2px; }
+.paste-body input[type='text'] { width: 100%; }
+.paste-body textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.paste-body textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.paste-actions { display: flex; align-items: center; gap: 8px; }
+.paste-note { flex-grow: 1; font-size: 11.5px; color: var(--ink-3); }
+.paste-actions .btn { height: var(--h-seg); font-size: 12px; }
+
+.files { list-style: none; display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow-y: auto; }
+.files li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--r-chip);
+  background: var(--surface-sunk);
+}
+.file-name { flex-grow: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-size { font-size: 11px; color: var(--ink-3); flex-shrink: 0; }
+.file-x {
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  border: 0; border-radius: 50%;
+  background: none; color: var(--ink-3);
+  font-size: 15px; line-height: 1; cursor: pointer;
+}
+.file-x:hover { background: var(--error-bg); color: var(--error); }
+
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: auto; }
+
+/* ----------------------------------------------------------- the verdicts */
+
+#open-all-btn { margin-left: auto; height: var(--h-seg); font-size: 12px; }
+
+.verdicts { display: flex; flex-direction: column; gap: 6px; }
+
+/* One clone per row. A row with somewhere to go is a <details>, so the
+ * disclosure, the keyboard and Escape all come from the browser; a row with
+ * nothing under it is a plain div rather than a control that opens onto
+ * nothing. Both wear the same line, so the list still reads as one column. */
+.verdict {
+  border-left: 3px solid var(--line);
+  border-radius: 0 var(--r-chip) var(--r-chip) 0;
+  background: var(--surface-sunk);
+}
+.verdict.is-clean { border-left-color: var(--ok); background: var(--ok-bg); }
+.verdict.is-changed { border-left-color: var(--attention); background: var(--attention-bg); }
+.verdict.is-unplaced,
+.verdict.is-rejected { border-left-color: var(--error); background: var(--error-bg); }
+
+/* the line itself: on a plain row it is the row, on a <details> it is the summary */
+div.verdict,
+.verdict > summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 10px;
+}
+
+.verdict > summary {
+  position: relative;          /* the chevron below is placed against this */
+  cursor: pointer;
+  list-style: none;
+  padding-left: 26px;
+}
+.verdict > summary::-webkit-details-marker { display: none; }
+/* Drawn rather than a list marker, so it can turn with the disclosure. */
+.verdict > summary::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 0; height: 0;
+  border-left: 4px solid var(--ink-3);
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transform: translateY(-50%);
+  transition: transform 120ms ease-out;
+}
+.verdict[open] > summary::before { transform: translateY(-50%) rotate(90deg); }
+.verdict > summary:hover { background: rgba(20, 23, 26, 0.03); }
+.verdict > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* a plain row carries no chevron, so its text lines up with the ones that do */
+div.verdict { padding-left: 26px; }
+
+.v-name { font-family: var(--font-mono); font-size: 12.5px; font-weight: 500; }
+.v-what { font-size: 12.5px; }
+.v-meta { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+
+.v-diffs { list-style: none; margin: 0 10px 8px 26px;
+  display: flex; flex-direction: column; gap: 1px; }
+.v-diffs li { display: flex; align-items: baseline; gap: 6px; }
+.v-diffs li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.d-substitution::before { background: var(--sub); }
+.d-deletion::before     { background: var(--del); }
+.d-insertion::before    { background: var(--ins); }
+.d-unaligned::before    { background: var(--ink-3); }
+
+.d-jump {
+  border: 0; background: none; padding: 0;
+  font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--ink-2); text-align: left; cursor: pointer;
+  text-decoration: underline; text-decoration-color: var(--line);
+}
+.d-jump:hover { color: var(--accent); text-decoration-color: currentColor; }
+
+/* ------------------------------------------------------------- the overview */
+
+.overview { display: flex; flex-direction: column; gap: 3px; }
+
+.ov-features {
+  position: relative;
+  height: 20px;
+  margin-left: var(--aln-name);
+  border-radius: var(--r-chip);
+  background: var(--chip);
+  overflow: hidden;
+}
+.ov-feature {
+  position: absolute; top: 0; bottom: 0;
+  display: flex; align-items: center;
+  padding: 0 3px;
+  border-right: 1px solid var(--surface);
+  background: var(--line-soft);
+  font-size: 9.5px; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden;
+}
+
+.ov-row { display: flex; align-items: center; gap: 0; }
+.ov-name {
+  width: var(--aln-name);
+  flex-shrink: 0;
+  padding-right: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ov-track {
+  position: relative;
+  flex-grow: 1;
+  height: 14px;
+  border-radius: var(--r-chip);
+  background: var(--surface-sunk);
+  border: 1px solid var(--line-soft);
+}
+.ov-row.is-clean .ov-track { background: var(--ok-bg); border-color: var(--ok-bg); }
+.ov-row.is-unplaced .ov-track { background: var(--error-bg); border-color: var(--error-bg); }
+
+.ov-tick {
+  position: absolute; top: -2px; bottom: -2px;
+  width: 3px; margin-left: -1px;
+  border: 0; border-radius: 1px;
+  padding: 0; cursor: pointer;
+}
+.ov-tick.d-substitution { background: var(--sub); }
+.ov-tick.d-deletion     { background: var(--del); }
+.ov-tick.d-insertion    { background: var(--ins); }
+.ov-tick.d-unaligned    { background: var(--ink-3); }
+.ov-tick:hover { top: -4px; bottom: -4px; width: 5px; }
+
+.ov-none {
+  position: absolute; left: 6px; top: 0; bottom: 0;
+  display: flex; align-items: center;
+  font-size: 10px; color: var(--error);
+}
+
+/* --------------------------------------------------------------- the viewer */
+
+.viewer-card .card-head { flex-wrap: wrap; }
+.viewer-card .jump { margin-left: auto; display: flex; gap: 6px; }
+.viewer-card .jump .btn { height: var(--h-seg); font-size: 12px; }
+
+.viewer { display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow: auto; }
+.aln-empty { padding: 18px 4px; font-size: 12.5px; color: var(--ink-2); }
+
+.aln-probe {
+  position: absolute; visibility: hidden; white-space: pre;
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0;
+}
+
+/* The viewer is the one scroller: the rows inside are laid out at their full
+ * width and the card scrolls over them, so the sticky name gutter and the
+ * scroll position are the same thing for every row. */
+.aln-scroll { position: relative; padding: 6px 0; width: max-content; }
+
+/* Where the last jump landed. Scrolling to the middle of ten thousand
+ * near-identical columns without saying which one was meant is how a jump
+ * button comes to feel broken. */
+.aln-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  border-left: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+  background: rgba(184, 92, 56, 0.09);
+  pointer-events: none;
+}
+
+.aln-row { display: flex; align-items: center; height: 17px; }
+.aln-name {
+  position: sticky; left: 0; z-index: 2;
+  width: var(--aln-name); flex-shrink: 0;
+  padding: 0 8px 0 10px;
+  background: var(--surface);
+  font-family: var(--font-mono); font-size: 11px; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.aln-row.is-ref .aln-name { color: var(--ink); font-weight: 500; }
+
+.aln-seq {
+  position: relative;
+  height: 17px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 17px;
+  white-space: pre;
+}
+.aln-seq > span { position: absolute; top: 0; }
+
+.aln-row.is-ref .aln-seq { color: var(--ink); }
+.aln-ruler { height: 14px; }
+.aln-ruler .aln-seq { height: 14px; line-height: 14px; }
+.aln-tick {
+  font-size: 9.5px;
+  color: var(--ink-3);
+  transform: translateX(-50%);
+  padding-left: calc(var(--ch) / 2);
+}
+
+/* a matching base is deliberately quiet: the eye should land on the other four */
+.c-m { color: var(--ink-3); }
+.c-x { color: var(--sub); background: var(--sub-bg); font-weight: 500; }
+.c-d { color: var(--del); background: var(--del-bg); }
+.c-i { color: var(--ins); background: var(--ins-bg); font-weight: 500; }
+.c-u { color: var(--ink-3); background: var(--unknown-bg); }
+.c-p { color: var(--line); }
+
+.status { padding: 0 24px 24px; font-size: 12px; color: var(--ink-2); }
+.status.is-bad { color: var(--error); }

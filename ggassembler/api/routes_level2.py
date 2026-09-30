@@ -434,6 +434,11 @@ def export(request: Request, body: DesignRequest) -> PlainTextResponse:
         length=result.length,
         issues=sorted({i.code for i in result.issues if i.level != "info"}),
     )
+    # and the sequence itself is kept, so that sequencing this construct in a
+    # week has something to be checked against: between the export and the
+    # reads there is a cloning step, and the predicted map is otherwise only
+    # ever a file in a downloads folder
+    library.remember_expected(design.name, result.product, level="level2")
     return PlainTextResponse(
         handle.getvalue(),
         headers={"Content-Disposition": f'attachment; filename="{design.name}.gb"'},

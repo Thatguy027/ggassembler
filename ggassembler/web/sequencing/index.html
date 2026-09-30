@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sequencing</title>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/sequencing/sequencing.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark"></span><span class="brand-name">GG Assembler</span></div>
+      <nav class="tabs">
+        <a class="tab" href="/part">Part plasmid</a>
+        <a class="tab" href="/">Cassette</a>
+        <a class="tab" href="/multigene">Multigene</a>
+        <a class="tab" href="/library">Library</a>
+        <a class="tab" href="/proteins">Proteins</a>
+        <a class="tab" href="/sequencing" aria-current="page">Sequencing</a>
+      </nav>
+      <div class="topbar-right"><span class="folder" id="folder">&nbsp;</span></div>
+    </header>
+
+    <div class="page-guide">
+      <details class="guide">
+        <summary>Check sequenced clones against the plasmid they were meant to be, and see exactly where they differ.</summary>
+        <div class="guide-body">
+        <span>Drop in the <b>GenBank or FASTA files your vendor sent back</b> &mdash; one per clone, or several at once. Nothing is uploaded anywhere; the files are read in this browser and compared on your own machine.</span>
+        <span>A whole-plasmid read <b>starts at an arbitrary base and may be on either strand</b>. That is not a difference, so each clone is placed on the reference first &mdash; the strand and start are reported, then ignored.</span>
+        <span>Every mismatch is named by the <b>feature it lands in</b>, because &ldquo;a substitution in the coding sequence&rdquo; is a decision and &ldquo;a substitution at 2,341&rdquo; is a coordinate.</span>
+        <span>A clone that is not this plasmid at all is <b>said to be unplaced</b>, never aligned into a wall of false mismatches.</span>
+        <span>Constructs you export from the <b>Cassette</b> and <b>Multigene</b> screens are kept here as references, so a design made today can be checked against reads that arrive next week.</span>
+        </div>
+      </details>
+    </div>
+
+    <div class="board">
+      <section class="card setup">
+        <div class="card-head">
+          <span class="card-title">What it should be</span>
+          <span class="card-note" id="ref-note"></span>
+        </div>
+
+        <div class="seg-group" role="group" aria-label="Where the reference comes from">
+          <button class="seg" id="src-library" aria-pressed="true">A plasmid in the library</button>
+          <button class="seg" id="src-expected" aria-pressed="false">A construct you designed</button>
+          <button class="seg" id="src-upload" aria-pressed="false">A file or paste</button>
+        </div>
+
+        <div id="pick-named">
+          <div class="finder finder-inline">
+            <label class="vh" for="finder-input">Search for the reference</label>
+            <input id="finder-input" class="finder-input" type="search" autocomplete="off"
+                   spellcheck="false"
+                   placeholder="Search by name, or by what is annotated inside &mdash; tdh, mScarlet, KanMX&hellip;">
+            <div class="finder-results" id="finder-results" role="listbox" hidden></div>
+          </div>
+          <label class="vh" for="reference">Reference plasmid</label>
+          <select id="reference" size="8"></select>
+        </div>
+
+        <div id="pick-file" hidden>
+          <label class="drop" id="ref-drop" for="ref-file">
+            <input id="ref-file" type="file" accept=".gb,.gbk,.genbank,.fa,.fasta,.fna,.seq,.txt">
+            <span class="drop-line" id="ref-file-name">Drop the expected map here, or choose a file</span>
+            <span class="drop-note">GenBank, FASTA or plain sequence</span>
+          </label>
+
+          <details class="paste">
+            <summary>or paste the expected sequence</summary>
+            <div class="paste-body">
+              <label class="vh" for="ref-paste-text">Expected sequence</label>
+              <textarea id="ref-paste-text" rows="4" spellcheck="false"
+                        placeholder="Paste GenBank, FASTA, or just the bases&hellip;"></textarea>
+              <div class="paste-actions">
+                <span class="paste-note" id="ref-paste-note"></span>
+                <button class="btn" id="ref-paste-btn">Use this</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="card setup">
+        <div class="card-head">
+          <span class="card-title">What came back</span>
+          <span class="card-note" id="clone-note">one file per clone</span>
+        </div>
+
+        <label class="drop drop-big" id="clone-drop" for="clone-files">
+          <input id="clone-files" type="file" multiple
+                 accept=".gb,.gbk,.genbank,.fa,.fasta,.fna,.seq,.txt">
+          <span class="drop-line">Drop the vendor&rsquo;s files here, or choose them</span>
+          <span class="drop-note">The file name becomes the clone&rsquo;s name</span>
+        </label>
+
+        <details class="paste">
+          <summary>or paste a sequence</summary>
+          <div class="paste-body">
+            <label class="vh" for="paste-name">Name this clone</label>
+            <input id="paste-name" type="text" placeholder="Name this clone &mdash; optional">
+            <label class="vh" for="paste-text">Sequence</label>
+            <textarea id="paste-text" rows="5" spellcheck="false"
+                      placeholder="Paste GenBank, FASTA, or just the bases&hellip;"></textarea>
+            <div class="paste-actions">
+              <span class="paste-note" id="paste-note"></span>
+              <button class="btn" id="paste-add-btn">Add clone</button>
+            </div>
+          </div>
+        </details>
+
+        <ul class="files" id="file-list"></ul>
+
+        <div class="actions">
+          <button class="btn" id="clear-btn" disabled>Clear</button>
+          <button class="btn btn-primary" id="run-btn" disabled>Align</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="report" id="report" hidden>
+      <section class="card">
+        <div class="card-head">
+          <span class="card-title" id="headline"></span>
+          <span class="card-note" id="headline-note"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <span class="card-title">The whole plasmid</span>
+          <span class="card-note">every difference, in place. Click one to jump to it.</span>
+        </div>
+        <div class="overview" id="overview"></div>
+      </section>
+
+      <section class="card viewer-card">
+        <div class="card-head">
+          <span class="card-title">Alignment</span>
+          <span class="card-note" id="viewer-note"></span>
+          <div class="jump">
+            <button class="btn" id="prev-btn">&larr; Previous difference</button>
+            <button class="btn" id="next-btn">Next difference &rarr;</button>
+          </div>
+        </div>
+        <div class="viewer" id="viewer"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <span class="card-title">Each clone</span>
+          <span class="card-note">open one to see where it differs</span>
+          <button class="btn" id="open-all-btn">Open all</button>
+        </div>
+        <div class="verdicts" id="verdicts"></div>
+      </section>
+    </div>
+
+    <p class="status" id="status"></p>
+  </div>
+
+  <script type="module" src="/static/sequencing/sequencing.js"></script>
+</body>
+</html>

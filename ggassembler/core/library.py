@@ -38,6 +38,7 @@ INDEX_FILE = "index.json"
 OVERRIDES_FILE = "overrides.json"
 DESIGNS_FILE = "designs.json"
 BUILDS_FILE = "builds.jsonl"
+EXPECTED_DIR = "expected"
 CONFIG_FILE = "config.json"
 INDEX_VERSION = 11
 
@@ -1799,6 +1800,62 @@ class Library:
         data["designs"] = after
         self._write_json(self.designs_path, data)
         return len(after) < len(before)
+
+    # -- constructs the app predicted -------------------------------------- #
+
+    @property
+    def expected_dir(self) -> Path:
+        return self.cache_dir / EXPECTED_DIR
+
+    def remember_expected(self, name: str, record: SeqRecord, level: str = "") -> Path:
+        """Keep the sequence of a construct this app said it would build.
+
+        Kept so that sequencing it later has something to be checked against.
+        Between designing a construct and getting a clone back there is a
+        cloning step and usually a week, and the predicted map is otherwise
+        only ever a download in a browser - which is exactly the file that is
+        missing on the day the reads arrive.
+
+        Written into `.ggasm/` rather than the library folder: this is what a
+        construct was *meant* to be, not a plasmid anyone has.
+        """
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._-") or "construct"
+        path = self.expected_dir / f"{safe}.gb"
+        record = record[:]  # a copy, so annotating it here cannot touch the caller's
+        record.annotations.setdefault("molecule_type", "DNA")
+        record.annotations["topology"] = "circular"
+        if level:
+            record.annotations["comment"] = f"predicted by GG Assembler ({level})"
+        seqio.write_genbank(record, path)
+        return path
+
+    def expected(self) -> list[dict[str, Any]]:
+        """Every predicted construct kept, newest first."""
+        out: list[dict[str, Any]] = []
+        if not self.expected_dir.exists():
+            return out
+        for path in self.expected_dir.glob("*.gb"):
+            try:
+                record = seqio.read_record(path)
+            except (OSError, ValueError):
+                continue  # a torn write should not hide the rest
+            out.append({
+                "name": path.stem,
+                "length": len(record.seq),
+                "path": str(path),
+                "saved_at": path.stat().st_mtime,
+            })
+        return sorted(out, key=lambda d: d["saved_at"], reverse=True)
+
+    def expected_record(self, name: str) -> SeqRecord | None:
+        """One predicted construct by name, or None if it was never kept."""
+        path = self.expected_dir / f"{name}.gb"
+        if not path.exists():
+            return None
+        try:
+            return seqio.read_record(path)
+        except (OSError, ValueError):
+            return None
 
     def _load_overrides(self) -> None:
         self.overrides = self._read_json(self.overrides_path)

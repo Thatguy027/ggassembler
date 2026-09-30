@@ -8,6 +8,7 @@ in that doubled coordinate space back onto the real molecule.
 
 from __future__ import annotations
 
+import io
 import warnings
 from pathlib import Path
 
@@ -56,6 +57,83 @@ def write_genbank(record: SeqRecord | list[SeqRecord], path: str | Path) -> Path
         warnings.simplefilter("ignore", BiopythonWarning)
         SeqIO.write(records, str(path), "genbank")
     return path
+
+
+def sniff_format(text: str) -> str:
+    """``genbank``, ``fasta`` or ``plain``, from the content rather than a name.
+
+    A sequencing vendor's file arrives through a browser, where the name is
+    whatever the person saved it as: `.txt`, `.seq`, no suffix at all. The
+    first non-blank line says what it is far more reliably.
+    """
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith(">"):
+            return "fasta"
+        if line.startswith("LOCUS"):
+            return "genbank"
+        # An `ORIGIN` block on its own is not a GenBank record - Biopython
+        # rejects it, having no LOCUS to read - but it is one of the commonest
+        # things to paste, so it goes to the plain reader below, which knows
+        # how to take it apart.
+        return "plain"
+    return "plain"
+
+
+#: Lines a pasted sequence block carries that are not sequence: the keyword a
+#: GenBank ORIGIN section opens with, and the marker that ends a record.
+BLOCK_EDGES = {"origin", "//"}
+
+
+def plain_sequence(text: str) -> str:
+    """The sequence out of a paste, with what a copy brings along taken off.
+
+    Sequence copied out of a plasmid editor, a vendor's web page or a GenBank
+    ORIGIN block arrives wrapped to sixty columns, numbered down the left and
+    as often as not in lower case. Digits and whitespace are never bases, so
+    dropping them cannot hide anything.
+
+    Letters are deliberately left alone. That is what keeps this from
+    swallowing text that is not sequence at all - a vendor's apology, an error
+    page - which must be refused rather than filtered down to whichever of its
+    letters happen to spell DNA.
+    """
+    kept = []
+    for line in text.splitlines():
+        if line.strip().lower() in BLOCK_EDGES:
+            continue
+        kept.append("".join(c for c in line if not (c.isspace() or c.isdigit())))
+    return "".join(kept).upper()
+
+
+def read_text_records(text: str, name: str = "sequence") -> list[SeqRecord]:
+    """Parse uploaded text as GenBank, FASTA, or bare sequence.
+
+    Bare sequence is accepted on purpose: people paste a consensus out of a
+    vendor's web page, and refusing it because it has no header would be
+    pedantry. Anything that is not sequence in that case is a parse error the
+    caller can report, not something to strip silently - a file that is really
+    an error message must not come back as a 40 bp plasmid.
+    """
+    fmt = sniff_format(text)
+    if fmt == "plain":
+        letters = plain_sequence(text)
+        bad = sorted({c for c in letters if c not in "ACGTUNRYSWKMBDHV"})
+        if bad or not letters:
+            raise ValueError(
+                f"{name}: not GenBank, not FASTA, and not DNA"
+                + (f" (found {', '.join(bad[:6])})" if bad else "")
+            )
+        return [SeqRecord(Seq(letters), id=name, name=name[:16], description="")]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", BiopythonParserWarning)
+        records = list(SeqIO.parse(io.StringIO(text), fmt))
+    if not records:
+        raise ValueError(f"{name}: no sequence found in this {fmt} file")
+    return records
 
 
 def is_circular(record: SeqRecord) -> bool:
