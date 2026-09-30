@@ -48,7 +48,20 @@ PART, ENTRY_VECTOR, CONNECTOR, CASSETTE, MULTIGENE_VECTOR = (
     "part", "entry_vector", "connector", "cassette", "multigene_vector",
 )
 
-SKIP_DIRS = {CACHE_DIR, ".git", ".venv", "venv", "__pycache__", "node_modules", ".Rproj.user"}
+#: A folder name that means "kept, but not in play". Redundant copies of a
+#: sequence go here rather than being deleted: the file is still on disk and
+#: still in git history, it just stops appearing in every dropdown.
+ARCHIVE_DIR = "_archive"
+
+SKIP_DIRS = {
+    CACHE_DIR, ARCHIVE_DIR, ".git", ".venv", "venv", "__pycache__",
+    "node_modules", ".Rproj.user",
+}
+
+#: Names that say a sequence was checked by sequencing. Between two identical
+#: files that is the one worth keeping, whatever it is called - the shortest
+#: name is a tie-break, not a quality signal.
+_SEQ_VERIFIED = re.compile(r"seq[ _-]*verified|sequence[ _-]*verified|verified", re.IGNORECASE)
 
 #: Labels that describe where a part came from or how it was made, rather than
 #: what it is. Everything else is fair game: for a type 8 part the E. coli
@@ -1195,7 +1208,12 @@ class Library:
         chosen = not (self.overrides.get(entry.path) or {}).get("canonical")
         in_first_root = not str(self.path_of(entry)).startswith(str(self.roots[0]))
         return (
-            chosen, in_first_root, not entry.path.endswith(".gb"), len(entry.name), entry.name
+            chosen,
+            not _SEQ_VERIFIED.search(entry.name),
+            in_first_root,
+            not entry.path.endswith(".gb"),
+            len(entry.name),
+            entry.name,
         )
 
     def set_canonical(self, relpath: str, canonical: bool = True) -> None:

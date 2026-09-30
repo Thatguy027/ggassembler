@@ -552,3 +552,68 @@ def test_clearing_an_override_puts_the_detected_type_back(tmp_path):
     library.set_override("promoter.gb", "3")
     library.set_override("promoter.gb", None)
     assert library.get("promoter").call.part_type == "2"
+
+
+def test_an_archive_folder_is_not_indexed(tmp_path):
+    """Redundant copies are moved aside rather than deleted, so the indexer has
+    to agree not to look there - otherwise archiving changes nothing."""
+    from ggassembler.core.library import ARCHIVE_DIR
+
+    record = synth.part_plasmid("2", name="promoter")
+    write_genbank(record, tmp_path / "promoter.gb")
+    archived = tmp_path / ARCHIVE_DIR / "plasmids"
+    archived.mkdir(parents=True)
+    write_genbank(record, archived / "promoter_old_name.gb")
+
+    library = Library(tmp_path)
+    library.scan()
+    assert len(library.entries) == 1
+    assert library.get("promoter_old_name") is None
+    assert library.duplicates() == {}
+
+
+def test_moving_a_file_back_out_of_the_archive_restores_it(tmp_path):
+    from ggassembler.core.library import ARCHIVE_DIR
+
+    record = synth.part_plasmid("2", name="promoter")
+    archived = tmp_path / ARCHIVE_DIR
+    archived.mkdir()
+    write_genbank(record, archived / "promoter.gb")
+
+    library = Library(tmp_path)
+    library.scan()
+    assert library.entries == {}
+
+    (archived / "promoter.gb").rename(tmp_path / "promoter.gb")
+    library = Library(tmp_path)
+    library.scan()
+    assert library.get("promoter") is not None
+
+
+def test_a_sequence_verified_copy_speaks_for_its_group(tmp_path):
+    """Between two identical files the verified one is the one worth keeping.
+
+    The old rule preferred the shortest name, which archived
+    `gal2_cassette_xylb_Seq_verified.gbk` in favour of `gal2_cassette.gb` -
+    keeping the unverified file and discarding the provenance.
+    """
+    record = synth.part_plasmid("2", name="thing")
+    write_genbank(record, tmp_path / "thing.gb")
+    write_genbank(record, tmp_path / "thing_seq_verified.gb")
+
+    library = Library(tmp_path)
+    library.scan()
+    entries = library.unique_entries()
+    assert len(entries) == 1
+    assert entries[0].name == "thing_seq_verified"
+    assert entries[0].aliases == ["thing"]
+
+
+def test_a_hand_chosen_canonical_still_beats_a_verified_name(tmp_path):
+    record = synth.part_plasmid("2", name="thing")
+    write_genbank(record, tmp_path / "thing.gb")
+    write_genbank(record, tmp_path / "thing_seq_verified.gb")
+    library = Library(tmp_path)
+    library.scan()
+    library.set_canonical("thing.gb")
+    assert library.unique_entries()[0].name == "thing"
