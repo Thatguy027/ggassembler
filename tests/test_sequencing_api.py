@@ -233,3 +233,73 @@ def test_a_pasted_reference_needs_no_file_either(client):
     )
     assert answer.status_code == 200
     assert answer.json()["clones"][0]["clean"]
+
+
+# ------------------------------------------------------ the alignment budget ---
+
+
+def _noise(n: int, seed: int) -> str:
+    import random
+    rng = random.Random(seed)
+    return "".join(rng.choice("ACGT") for _ in range(n))
+
+
+def test_an_oversized_divergence_comes_back_as_a_result_not_a_500(client):
+    """The case this screen exists for is also the one that strains it.
+
+    A 20 kb multigene reference against a full-plasmid read is exactly where
+    the pairwise aligner would be asked for something quadratic in twenty
+    thousand. Whatever the guard does, it has to arrive as JSON: an exception
+    reaches the browser as a 500, which the front end shows as an empty panel -
+    indistinguishable from the app having hung.
+    """
+    reference = _noise(20_000, 9)
+    clone = reference[:6_000] + _noise(8_000, 10) + reference[14_000:]
+
+    answer = client.post(
+        "/api/sequencing/run",
+        json={
+            "source": "upload",
+            "reference_file": {"name": "pBig.fa", "text": f">pBig\n{reference}\n"},
+            "clones": [fasta("A01", clone)],
+        },
+    )
+    assert answer.status_code == 200, answer.text[:400]
+
+    body = answer.json()
+    clone_result = body["clones"][0]
+    assert clone_result["placed"] is True
+    kinds = [d["kind"] for d in clone_result["differences"]]
+    assert kinds == ["unaligned"]
+    assert "6,000" in clone_result["differences"][0]["text"], "the limit is not named"
+    assert body["alignment"]["columns"] == len(reference)
+
+
+def test_a_twenty_kb_clone_of_the_real_thing_is_still_reported_clean(client):
+    """The guard must not fire on the ordinary case."""
+    reference = _noise(20_000, 9)
+    answer = client.post(
+        "/api/sequencing/run",
+        json={
+            "source": "upload",
+            "reference_file": {"name": "pBig.fa", "text": f">pBig\n{reference}\n"},
+            "clones": [fasta("A01", reference[7_000:] + reference[:7_000])],
+        },
+    )
+    assert answer.status_code == 200
+    assert answer.json()["clones"][0]["clean"] is True
+
+
+def test_a_reference_past_the_length_limit_is_refused_by_name(client):
+    """Named, with the number, rather than attempted and timed out."""
+    huge = "ACGT" * 60_000                       # 240 kb
+    answer = client.post(
+        "/api/sequencing/run",
+        json={
+            "source": "upload",
+            "reference_file": {"name": "huge.fa", "text": f">huge\n{huge}\n"},
+            "clones": [fasta("A01", "ACGT" * 100)],
+        },
+    )
+    assert answer.status_code == 422
+    assert "200,000" in answer.json()["detail"]

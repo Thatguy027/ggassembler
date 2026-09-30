@@ -60,10 +60,14 @@ MAX_WINDOW = 6000
 
 COMPLEMENT = str.maketrans("ACGTNRYSWKMBDHVacgtnryswkmbdhv", "TGCANYRSWMKVHDBtgcanyrswmkvhdb")
 
-#: What the clone had at a reference base, when it had nothing: a gap is a
-#: deletion the clone really carries, a dot is reference the read never covered.
+#: What the clone had at a reference base, when it had nothing. Three different
+#: things, and telling them apart is the whole job: a gap is a deletion the
+#: clone really carries, a dot is reference no read covered, and a query mark
+#: is a stretch too divergent to align - which is a statement about the clone,
+#: not a missing measurement.
 GAP = "-"
 UNCOVERED = "."
+UNALIGNED = "?"
 
 
 def revcomp(sequence: str) -> str:
@@ -145,7 +149,15 @@ class Difference:
             return f"{self.length} bp deleted at {where}{inside}"
         if self.kind == "insertion":
             return f"{len(self.found)} bp inserted before {where}{inside}"
-        return f"{self.length} bp could not be aligned at {where}{inside}"
+        # Name the limit. Without it this reads as a failure of the app rather
+        # than a statement about the clone, and the number is the one thing
+        # that says which it is: a stretch this long is not a clone with
+        # mismatches in it, it is a different construct.
+        return (
+            f"{self.length:,} bp could not be aligned at {where}{inside}: the clone "
+            f"diverges from the reference over more than {MAX_WINDOW:,} bp in one "
+            f"stretch, which is past what this app will align base by base"
+        )
 
 
 @dataclass
@@ -449,14 +461,14 @@ def compare(
         try:
             pairs.extend(_columns(ref_rotated[r:ref_start], clone_rotated[c:clone_start]))
         except _TooBig:
-            pairs.extend(("?", "?") for _ in range(ref_start - r))
+            pairs.extend((UNALIGNED, UNALIGNED) for _ in range(ref_start - r))
         pairs.extend(zip(ref_rotated[ref_start : ref_start + span],
                          clone_rotated[clone_start : clone_start + span]))
         r, c = ref_start + span, clone_start + span
     try:
         pairs.extend(_columns(ref_rotated[r:], clone_rotated[c:]))
     except _TooBig:
-        pairs.extend(("?", "?") for _ in range(len(ref_rotated) - r))
+        pairs.extend((UNALIGNED, UNALIGNED) for _ in range(len(ref_rotated) - r))
 
     _read_off(result, pairs, ref_at, len(reference))
     result.differences = _differences(result, reference, regions)
@@ -520,7 +532,7 @@ def _differences(
         got = result.at[i]
         if got == UNCOVERED:
             kind = ""
-        elif got == "?":
+        elif got == UNALIGNED:
             kind = "unaligned"
         elif got == GAP:
             kind = "deletion"

@@ -301,3 +301,77 @@ def test_stripping_digits_does_not_start_swallowing_prose():
 
 def test_lower_case_sequence_comes_back_upper():
     assert str(seqio.read_text_records("acgt\n", "x")[0].seq) == "ACGT"
+
+
+# --------------------------------------------------------------------------- #
+# the alignment budget
+# --------------------------------------------------------------------------- #
+#
+# A 20 kb multigene reference against a full-plasmid read is what this screen
+# exists for, and also the pair most likely to ask the pairwise aligner for
+# something quadratic in twenty thousand. The guard has to hold without the
+# caller ever seeing an exception.
+
+
+def big(n: int, seed: int) -> str:
+    rng = random.Random(seed)
+    return "".join(rng.choice("ACGT") for _ in range(n))
+
+
+def test_a_divergent_stretch_past_the_budget_is_reported_not_raised():
+    """The failure has to arrive as data. An exception here reaches the browser
+    as a 500 and the panel simply stays empty, which looks like the app hanging
+    rather than like an answer about the clone."""
+    reference = big(20_000, 9)
+    clone = reference[:6_000] + big(8_000, 10) + reference[14_000:]
+
+    result = align.compare(reference, clone, name="diverged")
+
+    assert result.placement.placed
+    unalignable = [d for d in result.differences if d.kind == "unaligned"]
+    assert len(unalignable) == 1
+    assert unalignable[0].length > align.MAX_WINDOW
+
+
+def test_the_unalignable_message_names_the_limit():
+    """Otherwise it reads as the app failing rather than as a fact about the
+    clone, and the number is the only thing that says which."""
+    reference = big(20_000, 9)
+    clone = reference[:6_000] + big(8_000, 10) + reference[14_000:]
+    note = next(
+        d for d in align.compare(reference, clone).differences if d.kind == "unaligned"
+    )
+    assert f"{align.MAX_WINDOW:,}" in note.describe()
+    assert "diverges" in note.describe()
+
+
+def test_a_clone_that_is_half_another_plasmid_still_answers():
+    reference = big(20_000, 9)
+    clone = reference[:10_000] + big(10_000, 11)
+    result = align.compare(reference, clone, name="chimera")
+    assert [d.kind for d in result.differences] == ["unaligned"]
+    assert "unalignable" in result.verdict()
+
+
+def test_an_unalignable_stretch_is_not_counted_as_matching():
+    reference = big(20_000, 9)
+    clone = reference[:6_000] + big(8_000, 10) + reference[14_000:]
+    result = align.compare(reference, clone)
+    assert result.identity(reference) < 70.0
+
+
+def test_a_twenty_kb_read_of_the_real_thing_is_still_clean():
+    """The guard must not fire on the case the screen is actually for."""
+    reference = big(20_000, 9)
+    result = align.compare(reference, reference[7_000:] + reference[:7_000])
+    assert result.differences == []
+    assert result.identity(reference) == 100.0
+
+
+def test_a_window_just_under_the_budget_is_aligned_properly():
+    """The limit has to sit where real work still gets done base by base."""
+    reference = big(20_000, 9)
+    clone = reference[:6_000] + big(align.MAX_WINDOW - 200, 12) + reference[6_000 + align.MAX_WINDOW - 200:]
+    kinds = {d.kind for d in align.compare(reference, clone).differences}
+    assert "unaligned" not in kinds
+    assert "substitution" in kinds

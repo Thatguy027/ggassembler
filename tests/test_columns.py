@@ -126,9 +126,22 @@ def test_each_kind_of_cell_is_told_apart():
         classOf('-', 'T'),   // the clone inserted a base here
         classOf('-', '-'),   // padding: another clone's insertion, not this one's
         classOf('A', '.'),   // never covered by a read
+        classOf('A', '?'),   // too divergent to align - nobody compared these
       ]));
     """)
-    assert out == ["m", "x", "d", "i", "p", "u"]
+    assert out == ["m", "x", "d", "i", "p", "u", "n"]
+
+
+def test_an_unalignable_stretch_is_not_painted_as_a_mismatch():
+    """Reading `?` as a mismatch paints eight thousand red cells across a row,
+    which says the clone has eight thousand substitutions. What happened is
+    that nobody compared those bases at all."""
+    out = run_js("""
+      const ref   = 'ACGTACGTAC';
+      const clone = 'ACG??????C';
+      console.log(JSON.stringify(runs(ref, clone, 0, 10).map(([kind, at]) => [kind, at])));
+    """)
+    assert out == [["m", 0], ["n", 3], ["m", 9]]
 
 
 def test_cells_come_out_as_runs_not_one_element_each():

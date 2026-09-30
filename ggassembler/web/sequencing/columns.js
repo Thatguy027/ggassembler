@@ -36,10 +36,18 @@ export function index(insertions, referenceLength) {
   return { colOf, refOf, columns: column };
 }
 
-/** What one cell is: match, mismatch, deletion, insertion, uncovered, padding. */
+/** What one cell is: match, mismatch, deletion, insertion, uncovered, padding,
+ * or a stretch too divergent to align.
+ *
+ * That last one needs its own answer. It arrives as `?`, and reading it as a
+ * mismatch paints eight thousand red cells across the row - which says the
+ * clone has eight thousand substitutions, when what happened is that nobody
+ * compared those bases at all.
+ */
 export function classOf(refChar, cloneChar) {
   if (refChar === '-') return cloneChar === '-' ? 'p' : 'i';
   if (cloneChar === '.') return 'u';
+  if (cloneChar === '?') return 'n';
   if (cloneChar === '-') return 'd';
   return cloneChar === refChar ? 'm' : 'x';
 }

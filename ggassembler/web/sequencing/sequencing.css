@@ -344,6 +344,9 @@ div.verdict { padding-left: 26px; }
 .c-d { color: var(--del); background: var(--del-bg); }
 .c-i { color: var(--ins); background: var(--ins-bg); font-weight: 500; }
 .c-u { color: var(--ink-3); background: var(--unknown-bg); }
+/* Not a mismatch: nobody compared these bases. Grey rather than red, so a
+   divergent stretch does not read as thousands of substitutions. */
+.c-n { color: var(--unknown-fg); background: var(--unknown-bg); font-weight: 500; }
 .c-p { color: var(--line); }
 
 .status { padding: 0 24px 24px; font-size: 12px; color: var(--ink-2); }
