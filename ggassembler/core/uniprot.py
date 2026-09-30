@@ -119,6 +119,9 @@ def search(
     query = query.strip()
     if not query:
         return []
+    # kept before the organism clause is folded in, since the ranking below
+    # compares it against gene names and accessions
+    original = query
     if organism:
         query = f"({query}) AND organism_id:{organism}"
 
@@ -130,9 +133,36 @@ def search(
     })
     entries = [parse_entry(raw) for raw in (fetch(url).get("results") or [])]
     if reviewed_first:
-        # a reviewed entry has been curated; among equals it is the one to take
-        entries.sort(key=lambda e: (not e.reviewed, e.length))
+        entries.sort(key=lambda e: rank(e, original))
     return entries
+
+
+def rank(entry: Entry, query: str) -> tuple:
+    """Sort key: what was asked for first, then what has been curated.
+
+    UniProt's own relevance put GRE3 above XKS1 for the query `XKS1`, which is
+    defensible as text search and useless as an answer - someone typing a gene
+    name has already decided which gene they want. So an exact match on the
+    gene name or the accession outranks everything, then a gene name that
+    merely starts with it, then reviewed entries, and only then whatever else
+    came back.
+
+    Length breaks the remaining ties, because among near-duplicates the shorter
+    record is nearly always the reviewed canonical one rather than an isoform.
+    """
+    wanted = query.strip().lower()
+    genes = [gene.lower() for gene in entry.genes]
+
+    if wanted and (wanted == entry.accession.lower() or wanted in genes):
+        exactness = 0
+    elif wanted and any(gene.startswith(wanted) for gene in genes):
+        exactness = 1
+    elif wanted and entry.name.lower().startswith(wanted):
+        exactness = 2
+    else:
+        exactness = 3
+
+    return (exactness, not entry.reviewed, entry.length)
 
 
 def entry(accession: str, fetch: Fetcher = _get) -> Entry:

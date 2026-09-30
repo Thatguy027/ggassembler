@@ -118,3 +118,14 @@
   font-size: 10.5px;
   color: var(--ink-3);
 }
+
+/* the free-text field beside the enzyme checkboxes */
+.extra-sites { display: flex; gap: 6px; margin-top: 6px; }
+.extra-sites input { flex-grow: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px; }
+.extra-sites .btn { height: var(--h-button); flex-shrink: 0; }
+
+/* A feasibility row reads as a verdict, so it is coloured like one. Flagged is
+ * amber, not red: these are thresholds vendors differ on, not errors. */
+.sum-row.is-flagged { background: var(--attention-bg); }
+.sum-row.is-flagged > span:nth-child(2) { color: var(--attention); font-weight: 600; }
+.sum-row.is-ok > span:nth-child(2) { color: var(--ok); }

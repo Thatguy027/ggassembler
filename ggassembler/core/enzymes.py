@@ -65,7 +65,18 @@ BBSI = Enzyme("BbsI", "GAAGAC", top_offset=8, bottom_offset=12)
 #: NotI, GC^GGCCGC - linearizes integration vectors.
 NOTI = Enzyme("NotI", "GCGGCCGC", top_offset=2, bottom_offset=6)
 
-ENZYMES: dict[str, Enzyme] = {e.name.lower(): e for e in (BSAI, BSMBI, BBSI, NOTI)}
+#: XhoI, C^TCGAG. Not a cloning enzyme here - the kit *writes* this site, at the
+#: start of every Type 4 part, for BglBrick compatibility. Worth being able to
+#: keep out of a synthetic CDS for exactly that reason: an extra copy inside the
+#: gene makes the intended one useless.
+XHOI = Enzyme("XhoI", "CTCGAG", top_offset=1, bottom_offset=5)
+#: BamHI, G^GATCC. The kit writes this one too, as the GGATCC that the Gly-Ser
+#: linker spells at the Type 3 / Type 4 junction.
+BAMHI = Enzyme("BamHI", "GGATCC", top_offset=1, bottom_offset=5)
+
+ENZYMES: dict[str, Enzyme] = {
+    e.name.lower(): e for e in (BSAI, BSMBI, BBSI, NOTI, XHOI, BAMHI)
+}
 
 
 def get_enzyme(name: str) -> Enzyme:

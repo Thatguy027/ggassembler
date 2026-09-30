@@ -53,12 +53,24 @@
 
         <div class="opts">
           <div class="opt">
+            <label class="lbl" for="part-type">Building</label>
+            <select id="part-type"></select>
+            <span class="card-note" id="part-type-why">&nbsp;</span>
+          </div>
+          <div class="opt">
             <label class="lbl" for="codon-table">Codon usage</label>
             <select id="codon-table"></select>
           </div>
           <div class="opt opt-grow">
             <span class="lbl">Keep these sites out of the sequence</span>
             <div class="enzymes" id="enzymes"></div>
+            <div class="extra-sites">
+              <label class="vh" for="extra-sites">Other enzymes or sites</label>
+              <input type="text" id="extra-sites" spellcheck="false"
+                     placeholder="Also keep out &mdash; XhoI, BamHI, GAATTC, GGNCC&hellip;">
+              <button class="btn" type="button" id="extra-apply">Apply</button>
+            </div>
+            <span class="card-note" id="extra-note">&nbsp;</span>
           </div>
         </div>
 

@@ -147,20 +147,59 @@ def _makes_site(sequence: str, codon: str, avoid: tuple[Enzyme, ...]) -> bool:
     return False
 
 
+def _trailing_run(text: str) -> int:
+    """How many of the same base the sequence currently ends on."""
+    if not text:
+        return 0
+    last = text[-1]
+    n = 1
+    while n < len(text) and text[-1 - n] == last:
+        n += 1
+    return n
+
+
 def back_translate(
     protein: str,
     avoid: tuple[Enzyme, ...] = (),
     stop: str | None = None,
     table: dict[str, tuple[str, ...]] | None = None,
+    smooth: bool = True,
 ) -> tuple[str, list[int]]:
     """Write `protein` as DNA, never spelling a site for anything in `avoid`.
 
     Returns the sequence and the positions (in residues) where the preferred
     codon had to be passed over - which is worth reporting, because those are
-    the only places the result differs from a plain codon-optimised gene.
+    the only places the result differs from a plain codon-optimised gene. Both
+    reasons for passing one over land in that list; what a reader needs from it
+    is where the sequence is not the textbook answer, not why.
 
     `stop` appends a stop codon when the protein does not carry one.
+
+    `smooth` lets a long single-base run break the tie between codons that are
+    equally legal. Always taking the most preferred codon is a deterministic
+    map from residue to bases, so a tract of one amino acid becomes a tract of
+    one codon: a poly-lysine stretch under the *E. coli* table is AAA repeated,
+    and thirty lysines are ninety adenines that no vendor will synthesise. It
+    is a preference and never a requirement - see the retry below.
     """
+    try:
+        return _write(protein, avoid, stop, table, smooth)
+    except BackTranslationError:
+        if not smooth:
+            raise
+        # Preferring a synonym can walk the search into a corner that the plain
+        # order would have got through. A gene with an awkward run in it beats
+        # no gene at all, so the unsmoothed answer is still the right one.
+        return _write(protein, avoid, stop, table, False)
+
+
+def _write(
+    protein: str,
+    avoid: tuple[Enzyme, ...],
+    stop: str | None,
+    table: dict[str, tuple[str, ...]] | None,
+    smooth: bool,
+) -> tuple[str, list[int]]:
     codons = table or SCEREVISIAE
     residues = clean_protein(protein)
     if not residues:
@@ -194,11 +233,23 @@ def back_translate(
         options = codons[residues[index]]
         start = picked[index] if index < len(picked) else 0
         sequence = "".join(out)
-        choice = next(
-            (r for r in range(start, len(options))
-             if not _makes_site(sequence, options[r], avoid)),
-            None,
-        )
+        legal = [
+            r for r in range(start, len(options))
+            if not _makes_site(sequence, options[r], avoid)
+        ]
+        choice = legal[0] if legal else None
+
+        if smooth and len(legal) > 1:
+            # Chosen only from codons that were already legal, so this cannot
+            # introduce a site; and only when a kinder one exists, so it cannot
+            # remove the answer.
+            kinder = next(
+                (r for r in legal
+                 if _trailing_run(sequence + options[r]) < HOMOPOLYMER_LIMIT),
+                None,
+            )
+            if kinder is not None:
+                choice = kinder
 
         if choice is None:
             if index == 0:
@@ -250,3 +301,141 @@ _REST: dict[str, str] = {
     "CTC": "L", "AGC": "S", "ATA": "I", "GTG": "V", "CCG": "P", "ACG": "T",
     "GCG": "A", "CGG": "R", "GGG": "G", "TAG": "*", "TGA": "*",
 }
+
+
+# --------------------------------------------------------------------------- #
+# will a vendor actually make this?
+# --------------------------------------------------------------------------- #
+#
+# A gene that is clean of restriction sites can still be refused, or quoted at
+# a premium, or silently delivered wrong. Synthesis houses screen on sequence
+# features rather than on biology: long single-base runs, exact internal
+# repeats, and windows of extreme GC. None of that is visible in a translation
+# check, and all of it is made *more likely* by the strategy above - always
+# taking the most preferred codon is a deterministic map from residue to bases,
+# so a run of one amino acid becomes a run of one codon, and a repeated motif
+# in the protein becomes an exact repeat in the DNA.
+#
+# These are reported rather than enforced. Thresholds differ between vendors
+# and change; what does not change is that you want to see the numbers before
+# you pay for the gene.
+
+#: A single-base run at or above this is worth flagging. Below it, nothing any
+#: mainstream vendor objects to; at 8 the quotes start carrying notes.
+HOMOPOLYMER_LIMIT = 8
+
+#: An exact internal repeat at or above this length is what makes an assembly
+#: mis-prime and a synthesis house ask questions.
+REPEAT_LIMIT = 20
+
+#: GC is measured across a sliding window, not over the whole gene: a sequence
+#: can sit at a perfectly comfortable 45% overall and still carry a 50 bp
+#: stretch at 15% that will not amplify.
+GC_WINDOW = 50
+GC_LOW, GC_HIGH = 25.0, 75.0
+
+
+def longest_homopolymer(dna: str) -> tuple[str, int, int]:
+    """The longest single-base run, as ``(base, length, 0-based start)``.
+
+    An empty sequence has no run, reported as ``("", 0, -1)`` rather than
+    raising: this is a report, and a report on nothing is not an error.
+    """
+    dna = dna.upper()
+    if not dna:
+        return "", 0, -1
+    best = (dna[0], 1, 0)
+    start = 0
+    for i in range(1, len(dna) + 1):
+        if i < len(dna) and dna[i] == dna[start]:
+            continue
+        if i - start > best[1]:
+            best = (dna[start], i - start, start)
+        start = i
+    return best
+
+
+def longest_repeat(dna: str, minimum: int = REPEAT_LIMIT) -> tuple[int, int, int]:
+    """The longest exact repeat of at least `minimum`, as ``(length, first, second)``.
+
+    Both positions are 0-based starts of the two copies; ``(0, -1, -1)`` means
+    there is no repeat that long.
+
+    Found by binary search over the length with a hash set per length, which is
+    O(n log n) on the sequence rather than the O(n^2) a pairwise scan would
+    cost. A 4 kb CDS is checked in a few milliseconds, which matters because
+    this runs on every keystroke-triggered rebuild.
+    """
+    dna = dna.upper()
+    if len(dna) < minimum * 2:
+        return 0, -1, -1
+
+    def found(length: int) -> tuple[int, int] | None:
+        seen: dict[str, int] = {}
+        for i in range(len(dna) - length + 1):
+            chunk = dna[i : i + length]
+            if chunk in seen:
+                return seen[chunk], i
+            seen[chunk] = i
+        return None
+
+    if found(minimum) is None:
+        return 0, -1, -1
+
+    low, high, best = minimum, len(dna) // 2 + 1, (minimum, *found(minimum))
+    while low <= high:
+        middle = (low + high) // 2
+        hit = found(middle)
+        if hit is None:
+            high = middle - 1
+        else:
+            best = (middle, *hit)
+            low = middle + 1
+    return best
+
+
+def gc_windows(dna: str, window: int = GC_WINDOW) -> tuple[float, float, int]:
+    """GC across sliding windows, as ``(lowest %, highest %, windows outside)``.
+
+    A sequence shorter than one window is measured whole, so the answer is
+    still about the sequence rather than about there being no windows.
+    """
+    dna = dna.upper()
+    if not dna:
+        return 0.0, 0.0, 0
+    size = min(window, len(dna))
+
+    running = sum(1 for base in dna[:size] if base in "GC")
+    lowest = highest = 100.0 * running / size
+    outside = 1 if not (GC_LOW <= lowest <= GC_HIGH) else 0
+
+    for i in range(size, len(dna)):
+        running += (dna[i] in "GC") - (dna[i - size] in "GC")
+        fraction = 100.0 * running / size
+        lowest = min(lowest, fraction)
+        highest = max(highest, fraction)
+        if not (GC_LOW <= fraction <= GC_HIGH):
+            outside += 1
+
+    return round(lowest, 1), round(highest, 1), outside
+
+
+def feasibility(dna: str) -> dict[str, object]:
+    """Every synthesis check in one shape, for a panel to render row by row."""
+    base, run, at = longest_homopolymer(dna)
+    length, first, second = longest_repeat(dna)
+    low, high, outside = gc_windows(dna)
+    return {
+        "homopolymer": {
+            "base": base, "length": run, "at": at,
+            "limit": HOMOPOLYMER_LIMIT, "ok": run < HOMOPOLYMER_LIMIT,
+        },
+        "repeat": {
+            "length": length, "first": first, "second": second,
+            "limit": REPEAT_LIMIT, "ok": length < REPEAT_LIMIT,
+        },
+        "gc": {
+            "min": low, "max": high, "outside": outside, "window": GC_WINDOW,
+            "low": GC_LOW, "high": GC_HIGH, "ok": outside == 0,
+        },
+    }

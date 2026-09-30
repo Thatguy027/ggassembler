@@ -11,6 +11,8 @@ this shape. That is what `UniProtError` and the 503 are for.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from ggassembler.core import uniprot
@@ -362,3 +364,252 @@ def test_the_page_offers_both_controls(client):
     assert 'id="codon-table"' in html and 'id="enzymes"' in html
     script = client.get("/static/uniprot/uniprot.js").text
     assert "codon_table" in script and "avoid: chosenEnzymes()" in script
+
+
+# ----------------------------------------------------------------- ranking ---
+
+
+def _raw(accession, gene, length, reviewed=True, name="", protein="a protein"):
+    return {
+        "primaryAccession": accession,
+        "uniProtkbId": name or f"{gene}_YEAST",
+        "genes": [{"geneName": {"value": gene}}] if gene else [],
+        "proteinDescription": {"recommendedName": {"fullName": {"value": protein}}},
+        "organism": {"scientificName": "Saccharomyces cerevisiae"},
+        "sequence": {"length": length, "value": "M" * length},
+        "entryType": "UniProtKB reviewed (Swiss-Prot)" if reviewed else "UniProtKB unreviewed (TrEMBL)",
+    }
+
+
+def _search(query, results, **kw):
+    """Search against a canned answer, so ranking is tested and not the network."""
+    return uniprot.search(query, fetch=lambda url: {"results": results}, **kw)
+
+
+def test_the_gene_you_named_comes_first():
+    """UniProt put GRE3 above XKS1 for the query `XKS1`.
+
+    Defensible as text search and useless as an answer: someone typing a gene
+    name has already decided which gene they want.
+    """
+    found = _search("XKS1", [
+        _raw("P38715", "GRE3", 327, protein="NADPH-dependent aldose reductase"),
+        _raw("P42826", "XKS1", 600, protein="Xylulose kinase"),
+    ])
+    assert [e.genes[0] for e in found] == ["XKS1", "GRE3"]
+
+
+def test_an_accession_matches_exactly_too():
+    found = _search("P38715", [
+        _raw("P42826", "XKS1", 600),
+        _raw("P38715", "GRE3", 327),
+    ])
+    assert found[0].accession == "P38715"
+
+
+def test_the_match_is_not_case_sensitive():
+    found = _search("xks1", [_raw("P38715", "GRE3", 327), _raw("P42826", "XKS1", 600)])
+    assert found[0].genes == ["XKS1"]
+
+
+def test_a_prefix_match_beats_an_unrelated_one_but_loses_to_an_exact_one():
+    found = _search("XKS", [
+        _raw("Q00000", "OTHER", 100),
+        _raw("Q00001", "XKS1B", 900),
+        _raw("Q00002", "XKS", 400),
+    ])
+    assert [e.genes[0] for e in found] == ["XKS", "XKS1B", "OTHER"]
+
+
+def test_reviewed_still_wins_among_equally_good_matches():
+    found = _search("XKS1", [
+        _raw("A00000", "XKS1", 600, reviewed=False),
+        _raw("P42826", "XKS1", 600, reviewed=True),
+    ])
+    assert found[0].accession == "P42826"
+
+
+def test_an_exact_match_outranks_a_reviewed_entry_that_is_not_one():
+    """The order that was wrong: curation is a tie-break, not the first key."""
+    found = _search("XKS1", [
+        _raw("P38715", "GRE3", 327, reviewed=True),
+        _raw("A00000", "XKS1", 600, reviewed=False),
+    ])
+    assert found[0].genes == ["XKS1"]
+
+
+def test_length_breaks_the_last_tie():
+    """Among near-duplicates the shorter record is usually the canonical one."""
+    found = _search("XKS1", [
+        _raw("A00001", "XKS1", 900),
+        _raw("A00002", "XKS1", 600),
+    ])
+    assert [e.length for e in found] == [600, 900]
+
+
+def test_an_entry_with_no_gene_name_still_ranks():
+    """Unreviewed records often have none; it must not raise."""
+    found = _search("XKS1", [_raw("A00003", "", 200), _raw("P42826", "XKS1", 600)])
+    assert found[0].genes == ["XKS1"]
+
+
+# ------------------------------------------------------------- part types ---
+
+
+PROTEIN = "MGKALEDLRQFATVSNW"
+
+
+def make(client, **body):
+    answer = client.post("/api/uniprot/part", json={"protein": PROTEIN, **body})
+    assert answer.status_code == 200, answer.json()
+    return answer.json()
+
+
+def test_a_type_3_target_gets_no_stop_codon(client):
+    """The contradiction this fixes.
+
+    A Type 3 part omits its stop - the Type 4 terminator supplies TAA right
+    after the ATCC overhang. Handing Level 1 a sequence with one on it means
+    Level 1's own conventions strip it straight back off, and the two screens
+    disagree about the same part.
+    """
+    made = make(client, part_type="3")
+    assert made["stop"] is False
+    assert not made["stop_added"]
+    assert made["length"] == len(PROTEIN) * 3
+    assert made["verified"]
+    assert "Type 4 terminator" in made["stop_reason"]
+
+
+@pytest.mark.parametrize("part_type", ["3", "3a", "3b"])
+def test_every_coding_type_omits_the_stop(client, part_type):
+    assert make(client, part_type=part_type)["stop"] is False
+
+
+def test_a_4a_fusion_keeps_its_stop(client):
+    """4a ends the protein itself, rather than reading through its TGGC flank."""
+    made = make(client, part_type="4a")
+    assert made["stop"] is True
+    assert made["dna"].endswith("TAA")
+    assert made["length"] == (len(PROTEIN) + 1) * 3
+
+
+def test_a_plain_gene_to_order_keeps_its_stop(client):
+    made = make(client, part_type="")
+    assert made["stop"] is True
+    assert made["dna"].endswith("TAA")
+    assert "open reading frame" in made["stop_reason"]
+
+
+def test_the_convention_can_be_overridden_but_says_so(client):
+    """Following the type is the default, not a rule with no way out."""
+    made = make(client, part_type="3", stop=True)
+    assert made["stop"] is True
+    assert made["stop_followed_convention"] is False
+    assert make(client, part_type="3")["stop_followed_convention"] is True
+
+
+def test_a_protein_that_arrives_with_a_stop_loses_it_for_a_type_3(client):
+    """Otherwise the answer depends on what the source record happened to hold."""
+    made = client.post(
+        "/api/uniprot/part", json={"protein": PROTEIN + "*", "part_type": "3"}
+    ).json()
+    assert made["stop"] is False
+    assert made["stop_removed"] is True
+    assert made["length"] == len(PROTEIN) * 3
+    assert made["verified"]
+
+
+def test_an_unknown_part_type_is_refused_by_name(client):
+    answer = client.post("/api/uniprot/part", json={"protein": PROTEIN, "part_type": "9"})
+    assert answer.status_code == 422
+    assert "9" in answer.json()["detail"]
+
+
+def test_the_options_endpoint_offers_the_part_types(client):
+    types = client.get("/api/uniprot/options").json()["part_types"]
+    keys = {t["key"]: t for t in types}
+    assert keys["3"]["stop"] is False and keys["4a"]["stop"] is True
+    assert "" in keys, "there must be a way to ask for a plain gene"
+    assert all(t["why"] for t in types), "every type has to say why"
+
+
+# ------------------------------------------------------ sites to keep out ---
+
+
+def test_a_site_can_be_given_by_name_including_the_bglbrick_pair(client):
+    """The kit writes XhoI and BamHI itself, so a CDS carrying one is a problem."""
+    made = make(client, avoid=["XhoI", "BamHI"])
+    assert made["avoided"] == ["XhoI", "BamHI"]
+    assert "CTCGAG" not in made["dna"]
+    assert "GGATCC" not in made["dna"]
+
+
+def test_a_site_can_be_spelled_out_instead_of_named(client):
+    """The only way to ask for something outside the list without shipping REBASE."""
+    made = make(client, avoid=["GAATTC"])
+    assert made["avoided"] == ["GAATTC"]
+    assert "GAATTC" not in made["dna"]
+
+
+def test_an_iupac_site_is_accepted_and_honoured(client):
+    made = make(client, avoid=["GGNCC"])
+    assert made["avoided"] == ["GGNCC"]
+    assert not re.search("GG[ACGT]CC", made["dna"])
+
+
+def test_names_and_sites_can_be_mixed(client):
+    made = make(client, avoid=["BsaI", "CTCGAG"])
+    assert made["avoided"] == ["BsaI", "CTCGAG"]
+
+
+def test_something_that_is_neither_is_refused_by_name(client):
+    answer = client.post(
+        "/api/uniprot/part", json={"protein": PROTEIN, "avoid": ["NotAnEnzyme"]}
+    )
+    assert answer.status_code == 422
+    assert "NotAnEnzyme" in answer.json()["detail"]
+
+
+def test_a_site_too_short_to_mean_anything_is_refused(client):
+    """`AT` would forbid most of the genetic code and look like a hang."""
+    answer = client.post("/api/uniprot/part", json={"protein": PROTEIN, "avoid": ["AT"]})
+    assert answer.status_code == 422
+    assert "short" in answer.json()["detail"]
+
+
+# ------------------------------------------------- synthesis feasibility ---
+
+
+def test_the_part_payload_carries_the_feasibility_checks(client):
+    report = make(client, part_type="3")["feasibility"]
+    assert set(report) == {"homopolymer", "repeat", "gc"}
+    for check in report.values():
+        assert "ok" in check and "limit" in check or "window" in check
+
+
+def test_the_checks_carry_their_own_proof(client):
+    """A row that cannot be checked is an assertion, not a report."""
+    report = make(client, part_type="3")["feasibility"]
+    assert report["homopolymer"]["at"] >= 0
+    assert report["gc"]["window"] == 50
+    assert report["gc"]["low"] == 25.0 and report["gc"]["high"] == 75.0
+
+
+def test_a_repeated_protein_motif_shows_up_as_a_dna_repeat(client):
+    """Highest-preference choice maps a repeated motif straight onto the bases."""
+    made = client.post("/api/uniprot/part", json={
+        "protein": "M" + "ACDEFGHIKLMNPQRST" * 4, "part_type": "3",
+    }).json()
+    assert made["feasibility"]["repeat"]["length"] >= 20
+    assert made["feasibility"]["repeat"]["ok"] is False
+
+
+def test_a_poly_lysine_gene_in_the_ecoli_table_is_not_ninety_adenines(client):
+    """The tie-break, end to end through the API."""
+    made = client.post("/api/uniprot/part", json={
+        "protein": "M" + "K" * 30 + "ACDEFGHIKLMNPQRSTVWY" * 4,
+        "codon_table": "ecoli",
+    }).json()
+    assert made["verified"]
+    assert made["feasibility"]["homopolymer"]["length"] < 20
