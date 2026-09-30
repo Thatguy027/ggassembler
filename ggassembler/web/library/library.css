@@ -1,0 +1,206 @@
+/* Part library. Layout only; colours, type and radii come from tokens.css.
+ *
+ * The table is the screen. It has to stay readable at 300+ rows, so the head
+ * sticks, the body scrolls inside the card, and the only rows that draw the eye
+ * are the ones that need a human: a conflict, an internal site, or no call.
+ */
+
+.page {
+  flex-grow: 1;
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ stats */
+
+.stats { display: flex; gap: 14px; flex-wrap: wrap; }
+
+.stat {
+  flex: 1 1 180px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stat-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+}
+.stat-label { font-size: 12px; color: var(--ink-3); }
+.stat-ok { color: var(--ok); }
+.stat-attention { color: var(--attention); }
+
+/* ---------------------------------------------------------------- filters */
+
+.filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.filters #q { width: 280px; }
+.filters #type-filter { width: 180px; }
+.filters #conf-filter { width: 200px; }
+.filters select { height: var(--h-button); }
+.filters .btn { display: inline-flex; align-items: center; text-decoration: none; }
+
+/* ------------------------------------------------------------------ table */
+
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 0 6px 6px;
+  flex-grow: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.index-table { width: 100%; border-collapse: collapse; }
+
+.index-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 14px 10px 8px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.index-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+  vertical-align: top;
+}
+.index-table tbody tr:last-child td { border-bottom: none; }
+.index-table tbody tr:hover td { background: var(--bg); }
+
+.index-table tr.attention td { background: var(--attention-bg); }
+.index-table tr.attention:hover td { background: #F7EDD8; }
+
+.cell-mono { font-family: var(--font-mono); font-size: 12px; }
+.cell-dim { color: var(--ink-3); }
+.cell-attention { color: var(--attention); }
+.cell-name { overflow-wrap: anywhere; }
+.cell-alias { display: block; font-size: 11px; color: var(--ink-3); }
+.cell-component { font-size: 12px; }
+
+.type-pill {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: var(--r-chip);
+  padding: 3px 9px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.type-pill:hover { border-color: var(--ink-2); }
+.type-pill-manual { box-shadow: inset 0 0 0 1px var(--accent); }
+
+.evidence { font-size: 12px; font-weight: 600; }
+.evidence-digest { color: var(--ok); }
+.evidence-weak { color: var(--attention); }
+.evidence-manual { color: var(--accent); }
+
+.empty { padding: 28px 10px; color: var(--ink-3); text-align: center; }
+
+.footnote { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+
+/* ----------------------------------------------------------------- dialog */
+
+.assign {
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 0;
+  background: var(--surface);
+  color: var(--ink);
+  width: min(420px, calc(100vw - 32px));
+}
+.assign::backdrop { background: rgba(20, 23, 26, 0.35); }
+.assign form { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 8px; }
+.assign-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; }
+.assign-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: 6px;
+}
+.assign-foot { margin-top: 10px; line-height: 1.5; }
+.assign-foot code { font-family: var(--font-mono); font-size: 11px; }
+.assign-actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+
+/* ----------------------------------------------------------------- narrow */
+
+@media (max-width: 900px) {
+  .index-table th:nth-child(5),
+  .index-table td:nth-child(5),
+  .index-table th:nth-child(8),
+  .index-table td:nth-child(8) { display: none; }
+}
+
+@media (max-width: 640px) {
+  .page { padding: 16px; }
+  .topbar { gap: 12px; padding: 0 16px; overflow-x: auto; }
+  .filters #q,
+  .filters #type-filter,
+  .filters #conf-filter { width: 100%; }
+  .index-table th:nth-child(2),
+  .index-table td:nth-child(2) { display: none; }
+}
+
+/* A description inferred from the file name rather than read from it. Italic
+ * so the table shows at a glance which rows the files themselves describe. */
+.cell-component.is-guessed { font-style: italic; opacity: 0.85; }
+
+/* A measured concentration, entered in the row it belongs to. */
+.conc-input {
+  width: 86px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-chip);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+  color: var(--ink);
+}
+.conc-input:disabled { opacity: 0.5; }
+
+/* Which of several identical files names the sequence everywhere else. */
+.cell-canonical {
+  display: block;
+  margin-top: 2px;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-chip);
+  background: var(--surface-sunk);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.cell-canonical:disabled { opacity: 0.5; }
+
+/* The end of a chunked table: the next slice loads as this scrolls into view. */
+td.more {
+  padding: 10px 12px;
+  color: var(--ink-3);
+  font-size: 12px;
+  text-align: center;
+}
+td.more.is-button { cursor: pointer; text-decoration: underline; }

@@ -1,0 +1,145 @@
+/* Level 3 - multigene assembly. Layout only; tokens.css owns the rest.
+ * The construct is linear here, not a ring: a multigene plasmid is read as an
+ * ordered chain of connectors, and a bar shows that order better than a circle.
+ */
+
+.board {
+  flex-grow: 1;
+  padding: 20px 24px 24px;
+  display: grid;
+  grid-template-columns: 420px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.col-chain, .col-result { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card.pad { padding: 18px; gap: 14px; }
+.card.grow { flex-grow: 1; }
+
+.section-title { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.lbl {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.stage-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.name-input {
+  font-family: var(--font-display); font-weight: 600; font-size: 16px;
+  color: var(--ink); background: transparent;
+  border: 1px solid transparent; border-radius: var(--r-chip);
+  padding: 2px 6px; margin-left: -6px; width: 22ch; max-width: 100%;
+}
+.name-input:hover { border-color: var(--line); }
+.name-input:focus { outline: none; border-color: var(--accent); background: var(--surface-sunk); }
+
+/* ---------------------------------------------------------------- TU list */
+
+.tu-list { display: flex; flex-direction: column; gap: 8px; }
+.tu {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px; border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--surface-sunk);
+}
+.tu-index {
+  font-family: var(--font-display); font-weight: 700; font-size: 12px;
+  width: 34px; flex-shrink: 0; color: var(--ink-2);
+}
+.tu { flex-wrap: wrap; }
+.tu select { flex-grow: 1; min-width: 0; }
+.tu-connectors {
+  flex-basis: 100%;
+  display: flex; align-items: center; gap: 6px;
+  padding-left: 42px; font-size: 11px; color: var(--ink-3);
+}
+.tu-connectors .oh { font-size: 10px; }
+.tu-fit { color: var(--ok); font-weight: 600; }
+.tu-misfit { color: var(--attention); font-weight: 600; }
+.tu-remove {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--ink-3); font-size: 16px; line-height: 1; padding: 4px 6px;
+  border-radius: var(--r-chip);
+}
+.tu-remove:hover { background: var(--error-bg); color: var(--error); }
+
+.suggestions {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; border-radius: var(--r-control); background: var(--attention-bg);
+}
+.suggestion { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.suggestion button {
+  border: 1px solid var(--control-line); background: var(--surface);
+  border-radius: var(--r-chip); font-size: 11px; padding: 2px 8px; cursor: pointer;
+}
+
+/* -------------------------------------------------- selected plasmid map */
+
+.plasmid-map { display: flex; flex-direction: column; gap: 8px; }
+
+.pm-track {
+  position: relative;
+  height: 26px;
+  border-radius: 5px;
+  background: var(--chip);
+  overflow: hidden;
+}
+.pm-feature {
+  position: absolute;
+  top: 5px;
+  height: 16px;
+  border-radius: 3px;
+  min-width: 2px;
+}
+/* the stretch the reaction replaces, drawn behind the features */
+.pm-unit {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(184, 92, 56, 0.16);
+  border-left: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+}
+.pm-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
+
+.pm-list { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.pm-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-2); }
+.pm-swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+.pm-item.is-unit { color: var(--accent); font-weight: 600; }
+
+/* ------------------------------------------------------------- linear map */
+
+.map { display: flex; flex-direction: column; gap: 8px; min-height: 64px; }
+.map-bar { display: flex; height: 40px; border-radius: 6px; overflow: hidden; }
+.map-seg {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #FFF; overflow: hidden; white-space: nowrap;
+  padding: 0 6px; min-width: 0;
+}
+.map-seg + .map-seg { border-left: 2px solid var(--surface); }
+.map-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
+
+.chain-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chain-link { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.chain-arrow { color: var(--ink-3); }
+
+/* ------------------------------------------------------------------ misc */
+
+.issues { display: flex; flex-direction: column; gap: 6px; }
+.issue {
+  display: flex; gap: 8px; align-items: baseline;
+  font-size: 12px; line-height: 1.45; padding: 7px 10px;
+  border-radius: var(--r-chip); background: var(--chip);
+}
+.issue-error   { background: var(--error-bg); color: var(--error); }
+.issue-warning { background: var(--attention-bg); color: var(--attention); }
+.issue-info    { background: var(--ok-bg); color: var(--ok); }
+.issue-code { font-family: var(--font-mono); font-size: 11px; opacity: 0.75; flex-shrink: 0; }
+
+.primers { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.primers td { padding: 4px 8px 4px 0; font-size: 12px; border-bottom: 1px solid var(--line-soft); }
+.primers td.mono { font-family: var(--font-mono); }
+
+@media (max-width: 1180px) { .board { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  .board { padding: 16px; gap: 16px; }
+  .topbar { gap: 12px; padding: 0 16px; overflow-x: auto; }
+}

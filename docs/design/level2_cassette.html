@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Cassette assembly</title>
+<script src="c49bc9cd-d237-45a3-9c68-d4a305dde862"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+</style>
+  <style>
+    body { margin: 0; background: #F7F5F0; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #14171A; }
+    a { color: #B85C38; } a:hover { color: #8F4426; }
+    .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    select { width: 100%; height: 36px; box-sizing: border-box; padding: 0 8px; border: 1px solid #D6CFC2; border-radius: 7px; background: #FDFCFA; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #14171A; }
+    .seg { border: 1px solid #D6CFC2; background: #FDFCFA; border-radius: 6px; height: 26px; padding: 0 10px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #5F6670; cursor: pointer; }
+    .seg-on { border-color: #14171A; background: #14171A; color: #F7F5F0; }
+    .oh { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #5F6670; background: #F2EFE9; border-radius: 5px; padding: 3px 6px; letter-spacing: 0.02em; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: #F7F5F0">
+
+  <header style="height: 64px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; gap: 28px; background: #14171A; color: #F7F5F0">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="width: 20px; height: 20px; border-radius: 50%; border: 3px solid {{accent}}; box-sizing: border-box"></div>
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px">GG Assembler</span>
+    </div>
+    <nav style="display: flex; gap: 4px">
+      <a href="Type1.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Part plasmid</a>
+      <a href="Main.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 600; background: #2C3138; color: #F7F5F0; text-decoration: none">Cassette</a>
+      <a href="Type3.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Multigene</a>
+      <a href="Library.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Library</a>
+    </nav>
+    <div style="flex-grow: 1"></div>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #B9BEC4">~/plasmids/YTK · 128 parts indexed</span>
+      <button style="height: 32px; padding: 0 12px; border: 1px solid #3A4048; background: transparent; color: #F7F5F0; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; cursor: pointer">Change folder</button>
+    </div>
+  </header>
+
+  <div style="flex-grow: 1; box-sizing: border-box; padding: 20px 24px 24px; display: flex; gap: 20px; align-items: stretch">
+
+    <!-- LEFT COLUMN: types 1-4 -->
+    <div style="width: 300px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: #5F6670">Upstream</span>
+        <span style="flex-grow: 1"></span>
+        <button class="seg seg-on" style="border-radius: 6px 0 0 6px">Parts</button>
+        <button class="seg" style="border-radius: 0 6px 6px 0; margin-left: -1px">2·3·4</button>
+      </div>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #DCEAF3; color: #1F4F6B; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center">1</span>
+          <span style="font-weight: 600; font-size: 13px">5′ connector</span>
+          <span style="flex-grow: 1"></span>
+          <span class="oh">CCCT→AACG</span>
+        </div>
+        <label class="vh" for="p1">Type 1 part</label>
+        <sc-raw-select id="p1"><option>ConLS — pYTK002</option></sc-raw-select>
+        <span style="font-size: 11px; color: #7A818A">7 parts match · ConLS starts a multigene chain</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #E4F0D5; color: #3E5C1E; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center">2</span>
+          <span style="font-weight: 600; font-size: 13px">Promoter</span>
+          <span style="flex-grow: 1"></span>
+          <span class="oh">AACG→TATG</span>
+        </div>
+        <label class="vh" for="p2">Type 2 part</label>
+        <sc-raw-select id="p2"><option>pTDH3 — pYTK009</option></sc-raw-select>
+        <span style="font-size: 11px; color: #7A818A">23 parts match</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #F5EFCE; color: #6B5A12; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center">3</span>
+          <span style="font-weight: 600; font-size: 13px">Coding sequence</span>
+          <span style="flex-grow: 1"></span>
+          <button class="seg" style="border-radius: 6px 0 0 6px">3</button>
+          <button class="seg seg-on" style="border-radius: 0 6px 6px 0; margin-left: -1px">3a+3b</button>
+        </div>
+        <label class="vh" for="p3a">Type 3a part</label>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span class="oh" style="width: 78px; text-align: center">TATG→TTCT</span>
+          <sc-raw-select id="p3a" style="flex-grow: 1"><option>Ubi-M (N-deg tag) — pYTK041</option></sc-raw-select>
+        </div>
+        <label class="vh" for="p3b">Type 3b part</label>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span class="oh" style="width: 78px; text-align: center">TTCT→ATCC</span>
+          <sc-raw-select id="p3b" style="flex-grow: 1"><option>Venus — pYTK045</option></sc-raw-select>
+        </div>
+        <span style="font-size: 11px; color: #7A818A">Split mode: Gly-Ser linker at the 3a/3b junction</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #F8DEE3; color: #7A2437; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center">4</span>
+          <span style="font-weight: 600; font-size: 13px">Terminator</span>
+          <span style="flex-grow: 1"></span>
+          <button class="seg seg-on" style="border-radius: 6px 0 0 6px">4</button>
+          <button class="seg" style="border-radius: 0 6px 6px 0; margin-left: -1px">4a+4b</button>
+        </div>
+        <label class="vh" for="p4">Type 4 part</label>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span class="oh" style="width: 78px; text-align: center">ATCC→GCTG</span>
+          <sc-raw-select id="p4" style="flex-grow: 1"><option>tADH1 — pYTK053</option></sc-raw-select>
+        </div>
+        <span style="font-size: 11px; color: #7A818A">6 parts match · switch to 4a+4b for a C-terminal fusion</span>
+      </section>
+
+      <div style="flex-grow: 1"></div>
+    </div>
+
+    <!-- CENTER: assembled construct -->
+    <div style="flex-grow: 1; background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; box-sizing: border-box; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px">pSZ-GG-001</span>
+          <span style="font-size: 11px; color: #7A818A">Level 2 cassette · BsaI-HFv2 · Amp, white colonies</span>
+        </div>
+        <span style="flex-grow: 1"></span>
+        <button style="height: 34px; padding: 0 12px; border: 1px solid #D6CFC2; background: #FDFCFA; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #14171A; cursor: pointer">Protocol</button>
+        <button style="height: 34px; padding: 0 14px; border: none; background: {{accent}}; color: #FFFFFF; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer">Export .gbk</button>
+      </div>
+
+      <div style="position: relative; height: 386px; display: flex; align-items: center; justify-content: center">
+        <div style="width: 340px; height: 340px; border-radius: 50%; background: conic-gradient(from -90deg, #6E9FC0 0deg 27deg, #FFFFFF 27deg 29deg, #8FB861 29deg 65deg, #FFFFFF 65deg 67deg, #D9C45A 67deg 127deg, #FFFFFF 127deg 129deg, #D97F92 129deg 155deg, #FFFFFF 155deg 157deg, #8E73C4 157deg 183deg, #FFFFFF 183deg 185deg, #D9AB5E 185deg 251deg, #FFFFFF 251deg 253deg, #9E6A3C 253deg 287deg, #FFFFFF 287deg 289deg, #8C8A86 289deg 358deg, #FFFFFF 358deg 360deg)"></div>
+        <div style="position: absolute; width: 244px; height: 244px; border-radius: 50%; background: #FFFFFF; border: 1px solid #EFEAE1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500">8,412 bp</span>
+          <span style="font-size: 12px; color: #7A818A">circular · 8 parts</span>
+          <span style="margin-top: 6px; font-size: 12px; font-weight: 600; color: #2F6F6B; background: #E4EEEC; border-radius: 20px; padding: 4px 12px">8 / 8 junctions compatible</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 20px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #6E9FC0"></span><span style="font-size: 12px; width: 44px; color: #5F6670">Type 1</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">ConLS</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #8E73C4"></span><span style="font-size: 12px; width: 44px; color: #5F6670">Type 5</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">ConR1</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #8FB861"></span><span style="font-size: 12px; width: 44px; color: #5F6670">Type 2</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">pTDH3</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #D9AB5E"></span><span style="font-size: 12px; width: 44px; color: #5F6670">Type 6</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">URA3</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #D9C45A"></span><span style="font-size: 12px; width: 44px; color: #5F6670">Type 3</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">Ubi-M · Venus</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #9E6A3C"></span><span style="font-size: 12px; width: 44px; color: #5F6670">Type 7</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">CEN6/ARS4</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #D97F92"></span><span style="font-size: 12px; width: 44px; color: #5F6670">Type 4</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">tADH1</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #8C8A86"></span><span style="font-size: 12px; width: 44px; color: #5F6670">Type 8</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">AmpR-ColE1</span></div>
+      </div>
+
+      <div style="border-top: 1px solid #EFEAE1; padding-top: 12px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #7A818A; font-weight: 600">Junction overhangs</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">CCCT</span>
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">AACG</span>
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">TATG</span>
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">TTCT</span>
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">ATCC</span>
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">GCTG</span>
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">TACA</span>
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">GAGT</span>
+          <span class="oh" style="background: #E4EEEC; color: #2F6F6B">CCGA</span>
+          <span style="font-size: 12px; color: #7A818A; align-self: center; margin-left: 4px">no repeats, no 3/4-nt cross-matches</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: types 5-8 -->
+    <div style="width: 300px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: #5F6670">Downstream</span>
+        <span style="flex-grow: 1"></span>
+        <button class="seg seg-on" style="border-radius: 6px 0 0 6px">Parts</button>
+        <button class="seg" style="border-radius: 0 6px 6px 0; margin-left: -1px">6·7·8</button>
+      </div>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #E8E0F5; color: #45307A; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center">5</span>
+          <span style="font-weight: 600; font-size: 13px">3′ connector</span>
+          <span style="flex-grow: 1"></span>
+          <span class="oh">GCTG→TACA</span>
+        </div>
+        <label class="vh" for="p5">Type 5 part</label>
+        <sc-raw-select id="p5"><option>ConR1 — pYTK067</option></sc-raw-select>
+        <span style="font-size: 11px; color: #7A818A">7 parts match · pairs with ConL1 downstream</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #F7E9CE; color: #6E4C13; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center">6</span>
+          <span style="font-weight: 600; font-size: 13px">Yeast marker</span>
+          <span style="flex-grow: 1"></span>
+          <span class="oh">TACA→GAGT</span>
+        </div>
+        <label class="vh" for="p6">Type 6 part</label>
+        <sc-raw-select id="p6"><option>URA3 — pYTK074</option></sc-raw-select>
+        <span style="font-size: 11px; color: #7A818A">7 parts match</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #EFE0D2; color: #5C3A18; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center">7</span>
+          <span style="font-weight: 600; font-size: 13px">Yeast origin / 3′ hom.</span>
+          <span style="flex-grow: 1"></span>
+          <span class="oh">GAGT→CCGA</span>
+        </div>
+        <label class="vh" for="p7">Type 7 part</label>
+        <sc-raw-select id="p7"><option>CEN6/ARS4 — pYTK081</option></sc-raw-select>
+        <span style="font-size: 11px; color: #7A818A">5 parts match · 3′ homology parts switch the build to integration</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #E6E4E1; color: #3A3A38; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center">8</span>
+          <span style="font-weight: 600; font-size: 13px">E. coli backbone</span>
+          <span style="flex-grow: 1"></span>
+          <button class="seg seg-on" style="border-radius: 6px 0 0 6px">8</button>
+          <button class="seg" style="margin-left: -1px">8a</button>
+          <button class="seg" style="border-radius: 0 6px 6px 0; margin-left: -1px">8b</button>
+        </div>
+        <label class="vh" for="p8">Type 8 part</label>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span class="oh" style="width: 78px; text-align: center">CCGA→CCCT</span>
+          <sc-raw-select id="p8" style="flex-grow: 1"><option>AmpR-ColE1 — pYTK083</option></sc-raw-select>
+        </div>
+        <span style="font-size: 11px; color: #7A818A">Drop-out vector · closes the circle back to Type 1</span>
+      </section>
+
+      <section style="background: #14171A; color: #F7F5F0; border-radius: 10px; padding: 13px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px">Reaction</span>
+        <div style="display: flex; justify-content: space-between"><span style="font-size: 12px; color: #9AA0A6">Enzyme</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">BsaI-HFv2</span></div>
+        <div style="display: flex; justify-content: space-between"><span style="font-size: 12px; color: #9AA0A6">Cycling</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">30× (37 °C 5′ / 16 °C 5′)</span></div>
+        <div style="display: flex; justify-content: space-between"><span style="font-size: 12px; color: #9AA0A6">Each part</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">20 fmol</span></div>
+        <div style="display: flex; justify-content: space-between"><span style="font-size: 12px; color: #9AA0A6">Selection</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">Amp · white</span></div>
+      </section>
+
+      <div style="flex-grow: 1"></div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#B85C38&quot;,&quot;options&quot;:[&quot;#B85C38&quot;,&quot;#2F6F6B&quot;,&quot;#45307A&quot;,&quot;#14171A&quot;]},&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#B85C38' };
+  }
+}
+</script>
+
+
+</body></html>

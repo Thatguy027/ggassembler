@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Multigene assembly</title>
+<script src="4e1ac410-0b24-4c72-829c-dd56e1aa92bc"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+</style>
+  <style>
+    body { margin: 0; background: #F7F5F0; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #14171A; }
+    a { color: #B85C38; } a:hover { color: #8F4426; }
+    .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    select { width: 100%; height: 36px; box-sizing: border-box; padding: 0 8px; border: 1px solid #D6CFC2; border-radius: 7px; background: #FDFCFA; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #14171A; }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+    .lbl { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #7A818A; font-weight: 600; }
+    .con { font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: #E8E0F5; color: #45307A; border-radius: 5px; padding: 3px 7px; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: #F7F5F0">
+
+  <header style="height: 64px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; gap: 28px; background: #14171A; color: #F7F5F0">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="width: 20px; height: 20px; border-radius: 50%; border: 3px solid {{accent}}; box-sizing: border-box"></div>
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px">GG Assembler</span>
+    </div>
+    <nav style="display: flex; gap: 4px">
+      <a href="Type1.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Part plasmid</a>
+      <a href="Main.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Cassette</a>
+      <a href="Type3.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 600; background: #2C3138; color: #F7F5F0; text-decoration: none">Multigene</a>
+      <a href="Library.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Library</a>
+    </nav>
+    <div style="flex-grow: 1"></div>
+    <span class="mono" style="font-size: 12px; color: #B9BEC4">Level 3 · BsmBI · connector-ordered</span>
+  </header>
+
+  <div style="flex-grow: 1; box-sizing: border-box; padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px">
+
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px">Transcriptional units</span>
+      <span style="font-size: 12px; color: #7A818A">Order is set by the connector pair each cassette carries, not by the slot it sits in.</span>
+      <span style="flex-grow: 1"></span>
+      <button style="height: 32px; padding: 0 12px; border: 1px solid #D6CFC2; background: #FDFCFA; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; cursor: pointer">+ Add TU</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #14171A; color: #F7F5F0; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center">1</span>
+          <span style="font-weight: 600; font-size: 13px">TU1</span>
+        </div>
+        <label class="vh" for="tu1">TU1 cassette</label>
+        <sc-raw-select id="tu1"><option>pSZ-GG-001 — pTDH3-Venus-tADH1</option></sc-raw-select>
+        <div style="display: flex; gap: 6px"><span class="con">ConLS</span><span style="font-size: 12px; color: #7A818A">→</span><span class="con">ConR1</span></div>
+        <span style="font-size: 11px; color: #7A818A">Carries ConLS — must be first</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #14171A; color: #F7F5F0; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center">2</span>
+          <span style="font-weight: 600; font-size: 13px">TU2</span>
+        </div>
+        <label class="vh" for="tu2">TU2 cassette</label>
+        <sc-raw-select id="tu2"><option>pSZ-GG-004 — pCCW12-mRuby2-tENO1</option></sc-raw-select>
+        <div style="display: flex; gap: 6px"><span class="con">ConL1</span><span style="font-size: 12px; color: #7A818A">→</span><span class="con">ConR2</span></div>
+        <span style="font-size: 11px; color: #7A818A">ConL1 matches TU1's ConR1</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #14171A; color: #F7F5F0; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center">3</span>
+          <span style="font-weight: 600; font-size: 13px">TU3</span>
+        </div>
+        <label class="vh" for="tu3">TU3 cassette</label>
+        <sc-raw-select id="tu3"><option>pSZ-GG-009 — pGAL1-Cas9-tTDH1</option></sc-raw-select>
+        <div style="display: flex; gap: 6px"><span class="con">ConL2</span><span style="font-size: 12px; color: #7A818A">→</span><span class="con">ConRE</span></div>
+        <span style="font-size: 11px; color: #7A818A">Carries ConRE — must be last</span>
+      </section>
+
+      <section style="background: #FBFAF7; border: 1px dashed #D6CFC2; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="width: 26px; height: 26px; border-radius: 7px; background: #E6E4E1; color: #7A818A; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center">4</span>
+          <span style="font-weight: 600; font-size: 13px; color: #7A818A">TU4 — empty</span>
+        </div>
+        <label class="vh" for="tu4">TU4 cassette</label>
+        <sc-raw-select id="tu4"><option>Choose a cassette…</option></sc-raw-select>
+        <span style="font-size: 11px; color: #7A818A">Or insert a ConL–Spacer–ConR filler cassette to close a gap</span>
+      </section>
+    </div>
+
+    <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 18px; display: flex; gap: 24px">
+      <div style="width: 420px; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px">Destination backbone</span>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <label class="lbl" for="dest3">Multigene vector cassette</label>
+          <sc-raw-select id="dest3"><option>pYTK096 — URA3 integration vector, KanR</option></sc-raw-select>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center"><span class="con">ConLS′</span><span style="font-size: 12px; color: #7A818A">— GFP dropout —</span><span class="con">ConRE′</span></div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+          <div style="display: flex; flex-direction: column; gap: 3px"><span class="lbl">Enzyme</span><span class="mono" style="font-size: 13px">BsmBI-v2</span></div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><span class="lbl">Selection</span><span class="mono" style="font-size: 13px">Kan · green→white</span></div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><span class="lbl">Locus</span><span class="mono" style="font-size: 13px">URA3 (5′/3′ hom.)</span></div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><span class="lbl">Linearize</span><span class="mono" style="font-size: 13px">NotI</span></div>
+        </div>
+      </div>
+
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px">Connector chain</span>
+        <div style="display: flex; align-items: stretch; height: 54px; border-radius: 7px; overflow: hidden; border: 1px solid #E2DCD1">
+          <div style="width: 58px; background: #6E9FC0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #12303F">ConLS</div>
+          <div style="flex-grow: 1; background: #F5EFCE; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #6B5A12">TU1</div>
+          <div style="width: 58px; background: #8E73C4; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #FFFFFF">ConR1</div>
+          <div style="flex-grow: 1; background: #F8DEE3; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #7A2437">TU2</div>
+          <div style="width: 58px; background: #8E73C4; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #FFFFFF">ConR2</div>
+          <div style="flex-grow: 1; background: #E4F0D5; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #3E5C1E">TU3</div>
+          <div style="width: 58px; background: #6E4C9E; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #FFFFFF">ConRE</div>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+          <span style="font-size: 12px; font-weight: 600; color: #2F6F6B; background: #E4EEEC; border-radius: 20px; padding: 5px 12px">Chain closed: ConLS → ConRE</span>
+          <span style="font-size: 12px; font-weight: 600; color: #2F6F6B; background: #E4EEEC; border-radius: 20px; padding: 5px 12px">No repeated connector</span>
+          <span style="font-size: 12px; font-weight: 600; color: #2F6F6B; background: #E4EEEC; border-radius: 20px; padding: 5px 12px">BsmBI overhangs unique (ConL/R barcode scars)</span>
+        </div>
+      </div>
+    </section>
+
+    <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 18px; flex-grow: 1; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px">Assembled multigene plasmid</span>
+        <span style="flex-grow: 1"></span>
+        <span class="mono" style="font-size: 12px; color: #7A818A">pSZ-MG-002 · 19,884 bp · 3 TUs</span>
+      </div>
+
+      <div style="display: flex; align-items: stretch; height: 58px; border-radius: 7px; overflow: hidden; border: 1px solid #E2DCD1">
+        <div style="width: 110px; background: #8C8A86; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #FFFFFF">URA3 5′ hom</div>
+        <div style="flex-grow: 1; background: #F5EFCE; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #6B5A12"><span style="font-size: 12px; font-weight: 600">TU1</span><span class="mono" style="font-size: 10px">pTDH3-Venus-tADH1</span></div>
+        <div style="flex-grow: 1; background: #F8DEE3; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #7A2437"><span style="font-size: 12px; font-weight: 600">TU2</span><span class="mono" style="font-size: 10px">pCCW12-mRuby2-tENO1</span></div>
+        <div style="flex-grow: 1; background: #E4F0D5; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #3E5C1E"><span style="font-size: 12px; font-weight: 600">TU3</span><span class="mono" style="font-size: 10px">pGAL1-Cas9-tTDH1</span></div>
+        <div style="width: 92px; background: #D9AB5E; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4A3208">URA3</div>
+        <div style="width: 92px; background: #E6E4E1; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #3A3A38">KanR-ColE1</div>
+        <div style="width: 110px; background: #8C8A86; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #FFFFFF">URA3 3′ hom</div>
+      </div>
+
+      <div style="flex-grow: 1"></div>
+      <div style="display: flex; gap: 10px; align-items: center">
+        <span style="font-size: 12px; color: #7A818A">Colony-PCR primers for the URA3 locus are emitted with the protocol.</span>
+        <span style="flex-grow: 1"></span>
+        <button style="height: 38px; padding: 0 14px; border: 1px solid #D6CFC2; background: #FDFCFA; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; cursor: pointer">Protocol</button>
+        <button style="height: 38px; padding: 0 18px; border: none; background: {{accent}}; color: #FFFFFF; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer">Export .gbk</button>
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#B85C38&quot;,&quot;options&quot;:[&quot;#B85C38&quot;,&quot;#2F6F6B&quot;,&quot;#45307A&quot;,&quot;#14171A&quot;]},&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#B85C38' };
+  }
+}
+</script>
+
+
+</body></html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Multigene assembly</title>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/level3/level3.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark"></span><span class="brand-name">GG Assembler</span></div>
+      <nav class="tabs">
+        <a class="tab" href="/part">Part plasmid</a>
+        <a class="tab" href="/">Cassette</a>
+        <a class="tab" href="/multigene" aria-current="page">Multigene</a>
+        <a class="tab" href="/library">Library</a>
+      </nav>
+      <div class="topbar-right"><span class="folder" id="folder">&nbsp;</span></div>
+    </header>
+
+    <div class="finder">
+      <label class="vh" for="finder-input">Search cassettes and backbones by annotation</label>
+      <input id="finder-input" class="finder-input" type="search" autocomplete="off"
+             spellcheck="false"
+             placeholder="Search annotations — try tdh, venus, natmx…">
+      <div class="finder-results" id="finder-results" hidden></div>
+    </div>
+
+    <div class="page-guide">
+      <details class="guide">
+        <summary>Order is set by the connector pair each cassette carries, not by the slot it sits in.</summary>
+        <div class="guide-body">
+        <span><b>The backbone sets the ends.</b> Pick it first: the chain must run from its right overhang round to its left.</span>
+        <span>The TU dropdown is <b>grouped by the connector each cassette starts at</b>, and the group that fits the current slot is marked “✓ fits here”.</span>
+        <span>Connector names (<code>ConS</code>, <code>Con1</code>, <code>ConE</code>…) are <b>learned from your own annotations</b>, not from a built-in table.</span>
+        <span>If the chain has a gap, the cassettes that start where it stopped are <b>offered below the slots</b> — including the spacer fillers.</span>
+        <span><b>Search by annotation</b> in the box above to find a cassette by what is expressed in it. A hit goes into the first slot its left connector fits, or a new one at the end.</span>
+        <span>The map shows the assembled construct; each junction keeps its <b>connector barcode</b> in the exported GenBank.</span>
+        </div>
+      </details>
+    </div>
+    <div class="board">
+      <div class="col-chain">
+        <section class="card pad">
+          <span class="section-title">Destination backbone</span>
+          <div class="field">
+            <label class="lbl" for="backbone">Multigene vector</label>
+            <select id="backbone"></select>
+          </div>
+          <span class="card-note" id="backbone-note">&nbsp;</span>
+          <div id="backbone-map" class="plasmid-map" hidden></div>
+        </section>
+
+        <section class="card pad">
+          <div class="card-head">
+            <span class="section-title">Transcription units</span>
+            <span style="flex-grow: 1"></span>
+            <button class="btn" type="button" id="add-tu">Add TU</button>
+          </div>
+          <div id="tu-list" class="tu-list"></div>
+          <div id="suggestions" class="suggestions" hidden></div>
+        </section>
+      </div>
+
+      <div class="col-result">
+        <section class="card pad">
+          <div class="card-head">
+            <div class="stage-title">
+              <label class="vh" for="name">Construct name</label>
+              <input id="name" class="name-input" value="pMultigene" spellcheck="false">
+              <span class="card-note" id="subtitle">&nbsp;</span>
+            </div>
+            <span style="flex-grow: 1"></span>
+            <button class="btn" type="button" id="save-btn" disabled>Save to library</button>
+            <button class="btn btn-primary" type="button" id="export-btn" disabled>Export .gbk</button>
+          </div>
+
+          <div class="map" id="map"><span class="card-note">choose a backbone and a cassette</span></div>
+          <div class="chain-strip" id="chain-strip"></div>
+        </section>
+
+        <section class="card pad grow">
+          <span class="section-title">Validation</span>
+          <div class="issues" id="issues"></div>
+          <div id="primers-box" hidden>
+            <span class="lbl">Junction check primers</span>
+            <table class="primers"><tbody id="primers"></tbody></table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/static/level3/level3.js"></script>
+</body>
+</html>

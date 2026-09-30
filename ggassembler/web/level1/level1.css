@@ -1,0 +1,179 @@
+/* Level 1 - part plasmid construction. Layout only; tokens.css owns the rest.
+ * A 520px input column beside a results column, per the design canvas.
+ */
+
+.board {
+  flex-grow: 1;
+  padding: 20px 24px 24px;
+  display: grid;
+  grid-template-columns: 520px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.col-input, .col-output { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card.pad { padding: 18px; gap: 14px; }
+.card.grow { flex-grow: 1; }
+
+.section-title { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.lbl {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.row { display: flex; gap: 12px; }
+.row .field { flex: 1 1 0; }
+.row .type-field { flex: 0 0 160px; }
+
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+  resize: vertical;
+}
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.conventions { border: none; display: flex; flex-direction: column; gap: 6px; }
+.conventions legend { padding: 0; margin-bottom: 4px; }
+.conventions label { display: flex; gap: 8px; align-items: center; font-size: 12px; }
+
+/* ------------------------------------------------------------------ tails */
+
+.tails {
+  border: 1px dashed var(--control-line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #FBFAF7;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.primer { display: flex; flex-direction: column; gap: 4px; }
+.primer-head { display: flex; gap: 10px; align-items: baseline; }
+.primer-name { font-size: 11px; color: var(--ink-3); }
+.primer-meta { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
+.primer-seq {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+.primer-seq span { padding: 1px 2px; }
+
+.seg-pad             { background: var(--badge-5-bg); }
+.seg-multigene_enzyme{ background: var(--badge-2-bg); }
+.seg-entry_overhang  { background: var(--badge-6-bg); }
+.seg-part_enzyme     { background: var(--badge-1-bg); }
+.seg-type_flank      { background: var(--badge-4-bg); }
+
+.legend-keys { display: flex; gap: 16px; flex-wrap: wrap; }
+.legend-key { font-size: 11px; color: var(--ink-3); }
+.legend-key .mono { padding: 1px 3px; }
+
+/* --------------------------------------------------------- domestication */
+
+.scan-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: var(--r-control);
+  font-size: 13px; line-height: 1.45;
+}
+.scan-ok { background: var(--ok-bg); }
+.scan-warn { background: var(--attention-bg); }
+.scan-mark {
+  width: 18px; height: 18px; border-radius: 50%;
+  color: #FFF; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.scan-ok .scan-mark { background: var(--ok); }
+.scan-warn .scan-mark { background: var(--attention); }
+
+/* --------------------------------------------------------------- results */
+
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fact { display: flex; flex-direction: column; gap: 3px; }
+.mono { font-family: var(--font-mono); font-size: 13px; }
+
+.verdict { display: flex; flex-direction: column; gap: 6px; }
+.verdict-line { display: flex; align-items: baseline; gap: 10px; }
+.verdict-bp { font-family: var(--font-mono); font-size: 22px; font-weight: 500; }
+
+.issues { display: flex; flex-direction: column; gap: 6px; }
+.issue {
+  display: flex; gap: 8px; align-items: baseline;
+  font-size: 12px; line-height: 1.45;
+  padding: 7px 10px; border-radius: var(--r-chip);
+  background: var(--chip);
+}
+.issue-error   { background: var(--error-bg); color: var(--error); }
+.issue-warning { background: var(--attention-bg); color: var(--attention); }
+.issue-info    { background: var(--ok-bg); color: var(--ok); }
+.issue-code { font-family: var(--font-mono); font-size: 11px; opacity: 0.75; flex-shrink: 0; }
+
+@media (max-width: 1180px) {
+  .board { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .board { padding: 16px; gap: 16px; }
+  .topbar { gap: 12px; padding: 0 16px; overflow-x: auto; }
+  .row { flex-direction: column; }
+  .facts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------- primers on the template */
+/* A primer is two things at once: a stretch that anneals to the template, and
+ * a tail that does not - the tail is what the first cycle adds. They are drawn
+ * differently for that reason: the tail hangs off the end of the duplex. */
+
+.binding { display: flex; flex-direction: column; gap: 10px; }
+
+.binding-row { display: flex; flex-direction: column; gap: 3px; }
+.binding-label { font-size: 11px; color: var(--ink-3); display: flex; gap: 8px; }
+.binding-strand {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.binding-tail { color: var(--accent); }
+.binding-anneal { background: var(--ok-bg); color: var(--ok); }
+.binding-template { color: var(--ink-2); }
+.binding-tick { color: var(--ink-3); }
+
+/* ---------------------------------------------------- the construct going in */
+
+.construct { display: flex; flex-direction: column; gap: 6px; }
+.construct-bar { display: flex; height: 26px; border-radius: 5px; overflow: hidden; }
+.construct-seg {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px;
+  overflow: hidden; white-space: nowrap; min-width: 0;
+  border-right: 1px solid var(--surface);
+}
+.construct-seg:last-child { border-right: none; }
+.construct-key { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.construct-key span { font-size: 11px; color: var(--ink-3); display: flex; gap: 5px; align-items: center; }
+.construct-swatch { width: 9px; height: 9px; border-radius: 2px; }
+
+/* ------------------------------------------------------------- the ligation */
+
+.ligation { display: flex; flex-direction: column; gap: 10px; }
+.junction { display: flex; flex-direction: column; gap: 2px; }
+.junction-title { font-size: 11px; color: var(--ink-3); }
+.junction-duplex {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre;
+  overflow-x: auto;
+}
+.junction-oh { background: var(--ok-bg); color: var(--ok); font-weight: 600; }
+.junction-vector { color: var(--ink-2); }
+.junction-insert { color: var(--accent); }
+.junction-nick { color: var(--ink-3); }

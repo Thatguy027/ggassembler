@@ -1,0 +1,388 @@
+/* Level 2 - cassette assembly. Layout only; every colour, font and radius
+ * comes from tokens.css. This file is owned by the Level 2 screen and is not
+ * read by any other level.
+ *
+ * The canvas is a three-column board: two 300px part columns either side of a
+ * stage that holds the circular map. It stays a three-column board down to
+ * about 1180px, then stacks - map first, because it is the thing you read.
+ */
+
+.board {
+  flex-grow: 1;
+  padding: 20px 24px 24px;
+  display: grid;
+  grid-template-columns: var(--col) minmax(0, 1fr) var(--col);
+  gap: 20px;
+  align-items: start;
+}
+
+.column { display: flex; flex-direction: column; gap: 12px; }
+.panels { display: flex; flex-direction: column; gap: 12px; }
+
+/* ------------------------------------------------------------------ panels */
+
+.panel-overhangs { display: flex; align-items: center; gap: 8px; }
+.panel-overhangs .oh { width: 82px; text-align: center; flex-shrink: 0; }
+.panel-overhangs select { flex-grow: 1; min-width: 0; }
+
+.panel.is-empty { border-color: var(--accent); }
+.panel.is-selected-elsewhere { opacity: 0.6; }
+
+/* ------------------------------------------------------------------- stage */
+
+.stage {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+}
+
+.stage-head { display: flex; align-items: center; gap: 12px; }
+.stage-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.name-input {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-chip);
+  padding: 2px 6px;
+  margin-left: -6px;
+  width: 22ch;
+  max-width: 100%;
+}
+.name-input:hover { border-color: var(--line); }
+.name-input:focus { outline: none; border-color: var(--accent); background: var(--surface-sunk); }
+
+/* --------------------------------------------------------------- the ring */
+
+.map {
+  position: relative;
+  height: 386px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring {
+  /* positioned, so the SVG wedge overlay measures itself against the ring and
+     not against the whole stage - otherwise the hit areas are scaled up and
+     land nowhere near the arcs they belong to */
+  position: relative;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: var(--chip);
+  transition: background 120ms linear;
+}
+
+.ring-hub {
+  position: absolute;
+  width: 244px;
+  height: 244px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 0 24px;
+  pointer-events: none;
+}
+.ring-bp { font-family: var(--font-mono); font-size: 22px; font-weight: 500; }
+
+/* the clickable arcs sit above the painted ring, exactly over it */
+.arc-layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.arc-hit { cursor: pointer; fill: transparent; }
+.arc-hit:hover { fill: rgba(20, 23, 26, 0.06); }
+.arc-hit:focus-visible { outline: 2px solid var(--accent); }
+
+/* ------------------------------------------------------------------ legend */
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 20px;
+}
+.legend-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-type { font-size: 12px; width: 44px; color: var(--ink-2); flex-shrink: 0; }
+.legend-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------- junctions */
+
+.junctions {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.section-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.junction-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* ---------------------------------------------------------------- issues */
+
+.issues { display: flex; flex-direction: column; gap: 6px; }
+.issue {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 7px 10px;
+  border-radius: var(--r-chip);
+  background: var(--chip);
+}
+.issue-error   { background: var(--error-bg); color: var(--error); }
+.issue-warning { background: var(--warn-bg);  color: var(--warn); }
+.issue-info    { background: var(--ok-bg);    color: var(--ok); }
+.issue-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------- reaction */
+
+.reaction { background: var(--ink); color: var(--on-dark); border: none; gap: 8px; }
+.reaction-title { font-family: var(--font-display); font-weight: 600; font-size: 13px; }
+.reaction-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.reaction-row > span:first-child { color: var(--on-dark-2); }
+.mono { font-family: var(--font-mono); font-size: 12px; }
+
+/* ----------------------------------------------------------------- narrow */
+
+@media (max-width: 1180px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stage { order: -1; }
+}
+
+@media (max-width: 640px) {
+  .board { padding: 16px; gap: 16px; }
+  .topbar { gap: 12px; padding: 0 16px; overflow-x: auto; }
+  .topbar-right { display: none; }
+  .map { height: 300px; }
+  .ring { width: 260px; height: 260px; }
+  .ring-hub { width: 186px; height: 186px; }
+  .legend { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------------------ picker */
+/* A filtering combobox in place of a <select>. At ninety-one options a native
+ * dropdown is a wall of ASCII-sorted names, and the detail that tells two
+ * parts apart cannot live in `title` where only a hover reveals it. The
+ * <select> stays in the DOM, hidden and in step, as the no-script fallback. */
+
+.pick { position: relative; flex-grow: 1; min-width: 0; }
+
+.pick-input {
+  width: 100%;
+  height: var(--h-control);
+  padding: 0 10px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+}
+.pick-input::placeholder { color: var(--ink-3); }
+.pick-input:disabled { background: var(--chip); color: var(--ink-3); }
+
+.pick-fallback { display: none; }
+
+.pick-list {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: calc(var(--h-control) + 4px);
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  box-shadow: 0 10px 26px rgba(20, 23, 26, 0.16);
+}
+
+.pick-group {
+  position: sticky;
+  top: 0;
+  padding: 6px 10px 4px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+
+.pick-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pick-row:hover,
+.pick-row.is-active { background: var(--chip); }
+.pick-row[aria-selected="true"] { box-shadow: inset 2px 0 0 var(--accent); }
+
+.pick-what { flex-grow: 1; min-width: 0; }
+.pick-name {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pick-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pick-sub.is-guessed { font-style: italic; }
+.pick-name mark, .pick-sub mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+/* the warning reads as a warning, rather than as a trailing glyph */
+.pick-warn {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--r-chip);
+  background: var(--attention-bg);
+  color: var(--attention);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.pick-len {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.pick-hint, .pick-clear {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: left;
+}
+.pick-clear { cursor: pointer; }
+.pick-clear:hover { background: var(--chip); color: var(--ink-2); }
+
+/* --------------------------------------------------------- clone a cassette */
+
+.clone-list {
+  margin-top: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+}
+.clone-list .pick-row { border-bottom: 1px solid var(--line-soft); }
+.clone-list .pick-row:last-child { border-bottom: 0; }
+
+/* What the decomposition found. Kept on the page rather than in the dialog:
+ * a partial match changes how you should read the panels below it. */
+.clone-report {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 24px 0;
+  padding: 9px 12px;
+  border: 1px solid var(--ok);
+  border-radius: var(--r-control);
+  background: var(--ok-bg);
+  font-size: 12.5px;
+  color: var(--ok);
+}
+.clone-report.is-partial {
+  border-color: var(--attention);
+  background: var(--attention-bg);
+  color: var(--attention);
+}
+.clone-report span { flex-grow: 1; }
+
+/* The position leads the panel; what usually goes there is the subtitle. */
+.card-ends { margin-left: 2px; font-size: 10.5px; }
+
+.saved-select {
+  height: var(--h-button);
+  max-width: 170px;
+  padding: 0 8px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+/* ------------------------------------------------------- expression track */
+/* The ring is proportional and correct; this is the thing you actually check.
+ * Promoter, coding sequence, terminator, in the direction they are read. */
+
+.expression {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.expression .track { width: 100%; height: auto; }
+.track-part { cursor: pointer; }
+.track-part:hover { opacity: 0.82; }
+.track-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  fill: var(--ink-3);
+}

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Part plasmid construction</title>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/level1/level1.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark"></span><span class="brand-name">GG Assembler</span></div>
+      <nav class="tabs">
+        <a class="tab" href="/part" aria-current="page">Part plasmid</a>
+        <a class="tab" href="/">Cassette</a>
+        <a class="tab" href="/multigene">Multigene</a>
+        <a class="tab" href="/library">Library</a>
+      </nav>
+      <div class="topbar-right"><span class="folder" id="folder">&nbsp;</span></div>
+    </header>
+
+    <div class="page-guide">
+      <details class="guide">
+        <summary>Paste a sequence, pick a part type, and it designs the primers that make it a part plasmid.</summary>
+        <div class="guide-body">
+        <span>Pick a <b>template from the library</b> or paste a sequence, then set the range and the part type you want.</span>
+        <span>With a library template the <b>Region</b> list is filled from that file's own annotations — pick the CDS and the coordinates fill themselves, so you never have to look them up elsewhere.</span>
+        <span>The <b>primer tails are colour-coded</b>: pad, the cloning enzyme (<code>BbsI</code> for the ccdB vectors), the overhang the destination accepts, <code>BsaI</code> (which releases the part later), and the type's own flank.</span>
+        <span><b>The destination decides how much the primer carries.</b> A universal ccdB vector always takes the same ends, so the insert brings its own BsaI sites and the type is set by them. A vector already cut for one type, or a part plasmid being reopened, supplies those sites itself — much shorter primers.</span>
+        <span><b>Internal BsaI, BsmBI, BbsI and NotI sites are always found and always reported</b>, with the single base change that would remove each one. Applying them is opt-in: in a promoter or terminator no change is truly silent, so the call is yours.</span>
+        <span>When removal is on and a site is too far from either end for a primer to reach, <b>the amplicon is split</b> and the two primers meeting at that junction spell the corrected bases.</span>
+        <span><b>gBlock</b> and <b>Oligo duplex</b> give the same insert without PCR.</span>
+        <span>The predicted plasmid is <b>fed back through the detector</b>, and the page only reports success if it classifies as the type you asked for.</span>
+        </div>
+      </details>
+    </div>
+    <div class="board">
+      <div class="col-input">
+        <section class="card pad">
+          <div class="card-head">
+            <span class="section-title">Insert</span>
+            <span style="flex-grow: 1"></span>
+            <div class="seg-group" role="group" aria-label="Insert source">
+              <button class="seg" type="button" data-mode="pcr" aria-pressed="true">PCR product</button>
+              <button class="seg" type="button" data-mode="gblock" aria-pressed="false">gBlock</button>
+              <button class="seg" type="button" data-mode="oligo" aria-pressed="false">Oligo duplex</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="template">Template</label>
+            <select id="template"><option value="">Paste a sequence instead&hellip;</option></select>
+          </div>
+
+          <div class="field" id="paste-field" hidden>
+            <label class="lbl" for="sequence">Pasted sequence</label>
+            <textarea id="sequence" rows="4" spellcheck="false"
+                      placeholder="ATG&hellip; (plain DNA; anything else is ignored)"></textarea>
+          </div>
+
+          <div class="row">
+            <div class="field" id="region-field" hidden>
+              <label class="lbl" for="region">Region</label>
+              <select id="region"><option value="">Whole template</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field"><label class="lbl" for="start">Amplicon start</label>
+              <input type="text" id="start" class="mono" value="1"></div>
+            <div class="field"><label class="lbl" for="end">Amplicon end</label>
+              <input type="text" id="end" class="mono" value="0" placeholder="end"></div>
+            <div class="field type-field"><label class="lbl" for="part-type">Target part type</label>
+              <select id="part-type"></select></div>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="name">Part name</label>
+            <input type="text" id="name" value="new_part" spellcheck="false">
+          </div>
+
+          <fieldset class="conventions">
+            <legend class="lbl">Sequence conventions</legend>
+            <label><input type="checkbox" id="c-glyser" checked> Gly-Ser linker (GG before the 3&prime; flank)</label>
+            <label>
+              <input type="checkbox" id="c-infer" checked>
+              Let a terminal stop codon mean &ldquo;this CDS ends here&rdquo;
+            </label>
+            <label><input type="checkbox" id="c-start" checked> Type 3: drop a leading ATG (TATG supplies it)</label>
+            <label><input type="checkbox" id="c-stop" checked> Strip a trailing stop codon</label>
+            <label><input type="checkbox" id="c-xhoi" checked> Type 4: lead with TAA + CTCGAG</label>
+            <label>
+              <input type="checkbox" id="c-domesticate">
+              Remove internal BsaI / BsmBI / BbsI / NotI sites by silent mutation
+            </label>
+            <span class="card-note">
+              Off by default: in a promoter or terminator no base change is truly
+              silent, so the scan reports what it would do and leaves the call to you.
+            </span>
+          </fieldset>
+
+          <div class="tails">
+            <span class="lbl">Generated primer tails</span>
+            <div id="primers"><span class="card-note">choose a template or paste a sequence</span></div>
+            <div class="legend-keys" id="legend-keys"></div>
+          </div>
+        </section>
+
+        <section class="card pad">
+          <span class="section-title">Primers on the template</span>
+          <div id="binding" class="binding"><span class="card-note">nothing designed yet</span></div>
+        </section>
+
+        <section class="card pad">
+          <span class="section-title">Domestication scan</span>
+          <div id="domestication"><span class="card-note">nothing scanned yet</span></div>
+          <span class="card-note" id="junction-note"></span>
+        </section>
+      </div>
+
+      <div class="col-output">
+        <section class="card pad">
+          <span class="section-title">Destination backbone</span>
+          <div class="field">
+            <label class="lbl" for="entry-vector">Destination plasmid</label>
+            <select id="entry-vector"></select>
+          </div>
+          <div class="facts">
+            <div class="fact"><span class="lbl">Enzyme</span><span class="mono" id="f-enzyme">&mdash;</span></div>
+            <div class="fact"><span class="lbl">Selection</span><span class="mono" id="f-selection">&mdash;</span></div>
+            <div class="fact"><span class="lbl">Fragments</span><span class="mono" id="f-fragments">&mdash;</span></div>
+          </div>
+        </section>
+
+        <section class="card pad grow">
+          <div class="card-head">
+            <span class="section-title">Predicted part plasmid</span>
+            <span style="flex-grow: 1"></span>
+            <button class="btn" type="button" id="save-btn" disabled>Save to library</button>
+            <button class="btn btn-primary" type="button" id="export-btn" disabled>Export .gbk</button>
+          </div>
+          <div class="verdict" id="verdict"><span class="card-note">nothing designed yet</span></div>
+          <div class="lbl" style="margin-top:6px">What goes in</div>
+          <div id="construct" class="construct"></div>
+          <div class="lbl" style="margin-top:10px">How it ligates</div>
+          <div id="ligation" class="ligation"></div>
+          <div id="issues" class="issues"></div>
+          <div class="field" id="alt-field" hidden>
+            <label class="lbl" for="alt">Order this</label>
+            <textarea id="alt" rows="5" class="mono" readonly></textarea>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/static/level1/level1.js"></script>
+</body>
+</html>

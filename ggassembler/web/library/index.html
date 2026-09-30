@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Part library</title>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/library/library.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <span class="brand-name">GG Assembler</span>
+      </div>
+      <nav class="tabs">
+        <a class="tab" href="/part">Part plasmid</a>
+        <a class="tab" href="/">Cassette</a>
+        <a class="tab" href="/multigene">Multigene</a>
+        <a class="tab" href="/library" aria-current="page">Library</a>
+      </nav>
+      <div class="topbar-right">
+        <span class="folder" id="folder">indexing&hellip;</span>
+        <button class="btn btn-ghost" type="button" id="rescan-btn">Re-scan</button>
+      </div>
+    </header>
+
+    <div class="page">
+      <details class="guide">
+        <summary>What each plasmid is comes from a simulated digest, never from its file name or annotations.</summary>
+        <div class="guide-body">
+        <span><b>Amber rows need a human</b>: a conflict between the digest and the annotations, an internal site, or nothing the digest could call.</span>
+        <span><b>Click the type pill</b> on any row to assign a type by hand. Manual assignments are stored in <code>.ggasm/overrides.json</code> and always beat detection.</span>
+        <span><b>Duplicate files are merged.</b> One sequence is one plasmid, and every filename it was found under is listed beneath its name.</span>
+        <span>The <b>Component</b> column reads the annotations inside the fragment that plasmid contributes — the part itself, not its vector.</span>
+        <span><b>Re-scan</b> after adding files. Only changed files are re-read, so it is near-instant.</span>
+        </div>
+      </details>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="filters">
+        <label class="vh" for="q">Search</label>
+        <input type="search" id="q" placeholder="Filter by name, type or overhang" autocomplete="off">
+        <label class="vh" for="type-filter">Type filter</label>
+        <select id="type-filter"><option value="">All part types</option></select>
+        <label class="vh" for="conf-filter">Confidence filter</label>
+        <select id="conf-filter">
+          <option value="">All confidence levels</option>
+          <option value="digest">digest</option>
+          <option value="annotation">annotation</option>
+          <option value="filename">filename</option>
+          <option value="none">unclassified</option>
+          <option value="manual">set by hand</option>
+          <option value="attention">needs attention</option>
+          <option value="internal-multigene">internal BsmBI site</option>
+          <option value="no_part_pair">unrecognised: no BsaI pair</option>
+          <option value="uncuttable">unrecognised: neither enzyme cuts</option>
+          <option value="linear">unrecognised: filed as linear</option>
+          <option value="assumed-circular">filed linear, read as circular</option>
+          <option value="merged">merged copies</option>
+          <option value="described-by-name">described by file name only</option>
+          <option value="undescribed">nothing describes it</option>
+        </select>
+        <span style="flex-grow: 1"></span>
+        <span class="card-note" id="count">&nbsp;</span>
+        <a class="btn" id="csv-btn" href="/api/library/index.csv" download>Export index .csv</a>
+      </div>
+
+      <section class="table-card">
+        <table class="index-table">
+          <thead>
+            <tr>
+              <th style="width: 250px">File</th>
+              <th style="width: 190px">Plasmid</th>
+              <th style="width: 100px">Type</th>
+              <th style="width: 180px" id="overhang-head">Overhangs</th>
+              <th style="width: 150px">Internal sites</th>
+              <th style="width: 140px">Evidence</th>
+              <th style="width: 210px">Component</th>
+              <th style="width: 110px">ng/µL</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr><td colspan="8" class="empty">indexing&hellip;</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <span class="footnote">
+        Overhangs are read from a simulated digest of each record, not from its
+        annotations; a file whose annotations disagree with its digest is listed
+        with the digest result and a conflict note.
+      </span>
+    </div>
+  </div>
+
+  <dialog id="assign-dialog" class="assign">
+    <form method="dialog">
+      <h2 class="assign-title" id="assign-title">Assign a type</h2>
+      <p class="card-note" id="assign-detected">&nbsp;</p>
+      <label class="assign-label" for="assign-type">Part type</label>
+      <select id="assign-type"></select>
+      <label class="assign-label" for="assign-reason">Why</label>
+      <input type="text" id="assign-reason" placeholder="e.g. checked by sequencing">
+      <p class="card-note assign-foot">
+        A manual assignment is stored in <code>.ggasm/overrides.json</code> and always
+        beats detection.
+      </p>
+      <div class="assign-actions">
+        <button class="btn" type="button" id="assign-clear">Clear override</button>
+        <span style="flex-grow: 1"></span>
+        <button class="btn" value="cancel">Cancel</button>
+        <button class="btn btn-primary" type="button" id="assign-save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/static/library/library.js"></script>
+</body>
+</html>

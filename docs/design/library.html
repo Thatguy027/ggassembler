@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Part library</title>
+<script src="8c2b1b08-1ca2-4d7a-9e10-c40b9ab38049"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+</style>
+  <style>
+    body { margin: 0; background: #F7F5F0; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #14171A; }
+    a { color: #B85C38; } a:hover { color: #8F4426; }
+    .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    input, select { height: 34px; box-sizing: border-box; padding: 0 10px; border: 1px solid #D6CFC2; border-radius: 7px; background: #FDFCFA; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #14171A; }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+    th { text-align: left; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #7A818A; font-weight: 600; padding: 0 12px 10px; }
+    td { padding: 11px 12px; border-top: 1px solid #F0ECE4; font-size: 13px; vertical-align: middle; }
+    .pill { display: inline-flex; align-items: center; border-radius: 6px; padding: 3px 8px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 12px; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: #F7F5F0">
+
+  <header style="height: 64px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; gap: 28px; background: #14171A; color: #F7F5F0">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="width: 20px; height: 20px; border-radius: 50%; border: 3px solid {{accent}}; box-sizing: border-box"></div>
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px">GG Assembler</span>
+    </div>
+    <nav style="display: flex; gap: 4px">
+      <a href="Type1.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Part plasmid</a>
+      <a href="Main.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Cassette</a>
+      <a href="Type3.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: #9AA0A6; text-decoration: none">Multigene</a>
+      <a href="Library.dc.html" style="height: 32px; padding: 0 14px; display: flex; align-items: center; border-radius: 7px; font-size: 13px; font-weight: 600; background: #2C3138; color: #F7F5F0; text-decoration: none">Library</a>
+    </nav>
+    <div style="flex-grow: 1"></div>
+    <span class="mono" style="font-size: 12px; color: #B9BEC4">~/plasmids/YTK</span>
+    <button style="height: 32px; padding: 0 12px; border: 1px solid #3A4048; background: transparent; color: #F7F5F0; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; cursor: pointer">Re-scan</button>
+  </header>
+
+  <div style="flex-grow: 1; box-sizing: border-box; padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px">
+
+    <div style="display: flex; gap: 14px">
+      <div style="flex-grow: 1; background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px">142</span>
+        <span style="font-size: 12px; color: #7A818A">.gb / .gbk files scanned</span>
+      </div>
+      <div style="flex-grow: 1; background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; color: #2F6F6B">128</span>
+        <span style="font-size: 12px; color: #7A818A">typed by BsaI/BsmBI digest</span>
+      </div>
+      <div style="flex-grow: 1; background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px">9</span>
+        <span style="font-size: 12px; color: #7A818A">composite (234, 678, 2-3-4…)</span>
+      </div>
+      <div style="flex-grow: 1; background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; color: #8A5A00">5</span>
+        <span style="font-size: 12px; color: #7A818A">unrecognised — need a manual type</span>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 10px; align-items: center">
+      <label class="vh" for="q">Search</label>
+      <input id="q" style="width: 280px" placeholder="Filter by name, type or overhang">
+      <label class="vh" for="ft">Type filter</label>
+      <sc-raw-select id="ft" style="width: 170px"><option>All part types</option></sc-raw-select>
+      <label class="vh" for="fc">Confidence filter</label>
+      <sc-raw-select id="fc" style="width: 190px"><option>All confidence levels</option></sc-raw-select>
+      <span style="flex-grow: 1"></span>
+      <button style="height: 34px; padding: 0 12px; border: 1px solid #D6CFC2; background: #FDFCFA; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; cursor: pointer">Export index .csv</button>
+    </div>
+
+    <section style="background: #FFFFFF; border: 1px solid #E2DCD1; border-radius: 10px; padding: 16px 6px 6px; flex-grow: 1; overflow: hidden">
+      <sc-raw-table style="width: 100%; border-collapse: collapse">
+        <sc-raw-thead>
+          <sc-raw-tr>
+            <sc-raw-th style="width: 250px">File</sc-raw-th>
+            <sc-raw-th style="width: 210px">Plasmid</sc-raw-th>
+            <sc-raw-th style="width: 110px">Type</sc-raw-th>
+            <sc-raw-th style="width: 190px">Overhangs (BsaI)</sc-raw-th>
+            <sc-raw-th style="width: 140px">Internal sites</sc-raw-th>
+            <sc-raw-th style="width: 150px">Evidence</sc-raw-th>
+            <sc-raw-th>Notes</sc-raw-th>
+          </sc-raw-tr>
+        </sc-raw-thead>
+        <sc-raw-tbody>
+          <sc-raw-tr>
+            <sc-raw-td class="mono" style="font-size: 12px">pYTK002_ConLS.gb</sc-raw-td>
+            <sc-raw-td>ConLS</sc-raw-td>
+            <sc-raw-td><span class="pill" style="background: #DCEAF3; color: #1F4F6B">1</span></sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px">CCCT → AACG</sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #7A818A">BsmBI ×1 (expected)</sc-raw-td>
+            <sc-raw-td><span style="font-size: 12px; color: #2F6F6B; font-weight: 600">digest</span></sc-raw-td>
+            <sc-raw-td style="color: #7A818A; font-size: 12px">Assembly connector, forward</sc-raw-td>
+          </sc-raw-tr>
+          <sc-raw-tr>
+            <sc-raw-td class="mono" style="font-size: 12px">pYTK009_pTDH3.gb</sc-raw-td>
+            <sc-raw-td>pTDH3</sc-raw-td>
+            <sc-raw-td><span class="pill" style="background: #E4F0D5; color: #3E5C1E">2</span></sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px">AACG → TATG</sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #7A818A">none</sc-raw-td>
+            <sc-raw-td><span style="font-size: 12px; color: #2F6F6B; font-weight: 600">digest</span></sc-raw-td>
+            <sc-raw-td style="color: #7A818A; font-size: 12px">BglII immediately 5′ of ATG</sc-raw-td>
+          </sc-raw-tr>
+          <sc-raw-tr>
+            <sc-raw-td class="mono" style="font-size: 12px">pYTK041_UbiM.gb</sc-raw-td>
+            <sc-raw-td>Ubi-M</sc-raw-td>
+            <sc-raw-td><span class="pill" style="background: #F5EFCE; color: #6B5A12">3a</span></sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px">TATG → TTCT</sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #7A818A">none</sc-raw-td>
+            <sc-raw-td><span style="font-size: 12px; color: #2F6F6B; font-weight: 600">digest</span></sc-raw-td>
+            <sc-raw-td style="color: #7A818A; font-size: 12px">N-terminal, GG before TTCT</sc-raw-td>
+          </sc-raw-tr>
+          <sc-raw-tr>
+            <sc-raw-td class="mono" style="font-size: 12px">pYTK045_Venus.gb</sc-raw-td>
+            <sc-raw-td>Venus</sc-raw-td>
+            <sc-raw-td><span class="pill" style="background: #F5EFCE; color: #6B5A12">3b</span></sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px">TTCT → ATCC</sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #7A818A">none</sc-raw-td>
+            <sc-raw-td><span style="font-size: 12px; color: #2F6F6B; font-weight: 600">digest</span></sc-raw-td>
+            <sc-raw-td style="color: #7A818A; font-size: 12px">Stop omitted, Gly-Ser read-through</sc-raw-td>
+          </sc-raw-tr>
+          <sc-raw-tr>
+            <sc-raw-td class="mono" style="font-size: 12px">pYTK047_GFPdropout.gb</sc-raw-td>
+            <sc-raw-td>GFP dropout</sc-raw-td>
+            <sc-raw-td><span class="pill" style="background: #F0EBE0; color: #5C5343">234r</span></sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px">AACG → GCTG</sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #8A5A00">BsaI reversed</sc-raw-td>
+            <sc-raw-td><span style="font-size: 12px; color: #2F6F6B; font-weight: 600">digest</span></sc-raw-td>
+            <sc-raw-td style="color: #7A818A; font-size: 12px">Reversed sites — omit final digest step</sc-raw-td>
+          </sc-raw-tr>
+          <sc-raw-tr>
+            <sc-raw-td class="mono" style="font-size: 12px">pYTK083_AmpR_ColE1.gb</sc-raw-td>
+            <sc-raw-td>AmpR-ColE1</sc-raw-td>
+            <sc-raw-td><span class="pill" style="background: #E6E4E1; color: #3A3A38">8</span></sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px">CCGA → CCCT</sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #7A818A">NotI ×2 (expected)</sc-raw-td>
+            <sc-raw-td><span style="font-size: 12px; color: #2F6F6B; font-weight: 600">digest</span></sc-raw-td>
+            <sc-raw-td style="color: #7A818A; font-size: 12px">Canonical cassette vector</sc-raw-td>
+          </sc-raw-tr>
+          <sc-raw-tr style="background: #FBF3E2">
+            <sc-raw-td class="mono" style="font-size: 12px">pSZ_GAL2_v3.gb</sc-raw-td>
+            <sc-raw-td>GAL2 (lab stock)</sc-raw-td>
+            <sc-raw-td><span class="pill" style="background: #F5EFCE; color: #6B5A12">3 ?</span></sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px">TATG → ATCC</sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #8A5A00">BsaI ×2 internal</sc-raw-td>
+            <sc-raw-td><span style="font-size: 12px; color: #8A5A00; font-weight: 600">digest, low conf.</span></sc-raw-td>
+            <sc-raw-td style="color: #8A5A00; font-size: 12px">Internal BsaI — domesticate before use</sc-raw-td>
+          </sc-raw-tr>
+          <sc-raw-tr style="background: #FBF3E2">
+            <sc-raw-td class="mono" style="font-size: 12px">pSZ_malibu_sensor.gb</sc-raw-td>
+            <sc-raw-td>Malibu sensor</sc-raw-td>
+            <sc-raw-td><span class="pill" style="background: #F0EBE0; color: #5C5343">—</span></sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #8A5A00">no BsaI pair found</sc-raw-td>
+            <sc-raw-td class="mono" style="font-size: 12px; color: #7A818A">—</sc-raw-td>
+            <sc-raw-td><span style="font-size: 12px; color: #8A5A00; font-weight: 600">unclassified</span></sc-raw-td>
+            <sc-raw-td style="color: #8A5A00; font-size: 12px"><a href="#assign">Assign a type manually</a></sc-raw-td>
+          </sc-raw-tr>
+        </sc-raw-tbody>
+      </sc-raw-table>
+    </section>
+
+    <span style="font-size: 12px; color: #7A818A">Overhangs are read from a simulated digest of each record, not from its annotations; a file whose annotations disagree with its digest is listed with the digest result and a conflict note.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#B85C38&quot;,&quot;options&quot;:[&quot;#B85C38&quot;,&quot;#2F6F6B&quot;,&quot;#45307A&quot;,&quot;#14171A&quot;]},&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#B85C38' };
+  }
+}
+</script>
+
+
+</body></html>
