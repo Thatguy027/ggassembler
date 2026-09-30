@@ -81,3 +81,40 @@
   color: var(--ink-2);
   white-space: pre;
 }
+
+/* the two choices that change the sequence */
+.opts {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+}
+.opt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.opt-grow { flex-grow: 1; }
+.opt select {
+  height: var(--h-control);
+  padding: 0 8px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.enzymes { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 4px; }
+.enzyme {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.enzyme-site {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+}

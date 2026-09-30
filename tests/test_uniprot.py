@@ -15,6 +15,8 @@ import pytest
 
 from ggassembler.core import uniprot
 from ggassembler.core.codons import (
+    SCEREVISIAE,
+    get_table,
     CODONS,
     BackTranslationError,
     back_translate,
@@ -263,3 +265,100 @@ def test_the_screen_is_served_and_linked(client):
     assert client.get("/proteins").status_code == 200
     for page in ("/", "/part", "/multigene", "/library"):
         assert 'href="/proteins"' in client.get(page).text, f"{page} has no link to it"
+
+
+# --------------------------------------------------------------------------- #
+# the two choices that change the sequence
+# --------------------------------------------------------------------------- #
+
+
+def test_a_codon_table_can_be_chosen(client):
+    """A part bound for E. coli wants E. coli codons."""
+    from ggassembler.core.codons import ECOLI, SCEREVISIAE, get_table
+
+    assert get_table(None) is SCEREVISIAE
+    assert get_table("ecoli") is ECOLI
+    assert get_table("S. cerevisiae") is SCEREVISIAE, "the display name should resolve"
+    with pytest.raises(ValueError, match="unknown codon table"):
+        get_table("nonesuch")
+
+
+def test_the_two_tables_give_genuinely_different_sequences():
+    protein = "MGKALEDLRQAGGSRPWLEEK" * 6
+    yeast, _ = back_translate(protein, avoid=AVOID, table=get_table("scerevisiae"))
+    coli, _ = back_translate(protein, avoid=AVOID, table=get_table("ecoli"))
+    assert yeast != coli
+    assert translate(yeast) == translate(coli) == protein
+
+    def gc(dna):
+        return sum(dna.count(b) for b in "GC") / len(dna)
+
+    # E. coli's preferred codons are markedly GC-richer; if this ever stops
+    # holding, one of the tables has been mangled
+    assert gc(coli) > gc(yeast) + 0.10
+
+
+def test_every_table_covers_every_residue():
+    from ggassembler.core.codons import TABLES
+
+    residues = set(SCEREVISIAE)
+    for name, table in TABLES.items():
+        assert set(table) == residues, f"{name} is missing residues"
+        for residue, codons in table.items():
+            assert codons, f"{name} has no codon for {residue}"
+            for codon in codons:
+                assert len(codon) == 3 and set(codon) <= set("ACGT")
+                assert translate(codon) == residue, f"{name}: {codon} is not {residue}"
+
+
+def test_the_enzymes_to_avoid_can_be_chosen(client):
+    """Unticking one is a choice - the part may be going somewhere that never
+    sees that enzyme, and the alternative is a run of rare codons."""
+    protein = "MGKALEDLRQ" * 8
+    default = client.post("/api/uniprot/part", json={"protein": protein}).json()
+    assert set(default["avoided"]) >= {"BsaI", "BsmBI", "NotI"}
+
+    one = client.post(
+        "/api/uniprot/part", json={"protein": protein, "avoid": ["BsaI"]}
+    ).json()
+    assert one["avoided"] == ["BsaI"]
+
+
+def test_avoiding_nothing_is_a_choice_not_an_omission(client):
+    """`None` means the scheme's own enzymes; `[]` means avoid nothing. They
+    have to be different or one of them is unreachable."""
+    protein = "MGKALEDLRQ" * 8
+    none_given = client.post("/api/uniprot/part", json={"protein": protein}).json()
+    explicit = client.post(
+        "/api/uniprot/part", json={"protein": protein, "avoid": []}
+    ).json()
+    assert none_given["avoided"] and explicit["avoided"] == []
+
+
+def test_an_unknown_enzyme_is_refused(client):
+    response = client.post(
+        "/api/uniprot/part", json={"protein": "MGK", "avoid": ["EcoRI"]}
+    )
+    assert response.status_code == 422
+
+
+def test_an_unknown_codon_table_is_refused(client):
+    response = client.post(
+        "/api/uniprot/part", json={"protein": "MGK", "codon_table": "nonesuch"}
+    )
+    assert response.status_code == 422
+
+
+def test_the_options_endpoint_lists_what_can_be_picked(client):
+    options = client.get("/api/uniprot/options").json()
+    assert {t["key"] for t in options["codon_tables"]} == {"scerevisiae", "ecoli"}
+    assert [e["name"] for e in options["enzymes"]], "no default enzymes offered"
+    for enzyme in options["enzymes"]:
+        assert enzyme["default"] and enzyme["site"]
+
+
+def test_the_page_offers_both_controls(client):
+    html = client.get("/proteins").text
+    assert 'id="codon-table"' in html and 'id="enzymes"' in html
+    script = client.get("/static/uniprot/uniprot.js").text
+    assert "codon_table" in script and "avoid: chosenEnzymes()" in script

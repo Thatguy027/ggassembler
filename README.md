@@ -77,10 +77,14 @@ sequence goes by. Manual type assignments and measured concentrations live in
 
 **Proteins** — the one screen that uses the network. Search UniProt, and the
 protein comes back as DNA. Codons are chosen one at a time, never using one
-that would spell a BsaI, BsmBI, BbsI or NotI site — which is not the same as
-domesticating afterwards, where a synonymous change made to remove one site can
-spell another two codons downstream. The result is a gene to order, not the
-organism's own sequence.
+that would spell a site — which is not the same as domesticating afterwards,
+where a synonymous change made to remove one site can spell another two codons
+downstream. Two choices change the sequence: codon usage (*S. cerevisiae* or
+*E. coli*, the classical preferred-codon orderings for highly expressed genes —
+an ordering, not a frequency table, so no CAI is claimed) and which enzymes to
+keep out, defaulting to the scheme's own. Unticking one is a real choice: if
+the part will never meet that enzyme, avoiding it is not worth a run of rare
+codons. The result is a gene to order, not the organism's own sequence.
 
 ## What it will not do
 

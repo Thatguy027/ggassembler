@@ -23,9 +23,15 @@ from __future__ import annotations
 
 from .enzymes import Enzyme
 
-#: Synonymous codons per amino acid, most preferred in *S. cerevisiae* first.
-#: Stops are included so a sequence given with a terminal `*` round-trips.
-CODONS: dict[str, tuple[str, ...]] = {
+#: Synonymous codons per amino acid, most preferred first.
+#:
+#: These are the classical preferred-codon orderings for highly expressed genes
+#: - the sets that have been in use since Bennetzen & Hall and Sharp & Cowe.
+#: They are an *ordering*, not a frequency table: this module does not compute
+#: a CAI and does not claim one. What the ordering has to be right about is
+#: which codon to reach for first and what to fall back to, which is all the
+#: site-avoidance below needs.
+SCEREVISIAE: dict[str, tuple[str, ...]] = {
     "A": ("GCT", "GCC", "GCA", "GCG"),
     "R": ("AGA", "AGG", "CGT", "CGC", "CGA", "CGG"),
     "N": ("AAC", "AAT"),
@@ -49,8 +55,60 @@ CODONS: dict[str, tuple[str, ...]] = {
     "*": ("TAA", "TGA", "TAG"),
 }
 
+#: The same for *E. coli*, for a part that will be expressed there rather than
+#: in yeast - a marker, or a protein being made before it is moved across.
+ECOLI: dict[str, tuple[str, ...]] = {
+    "A": ("GCG", "GCT", "GCC", "GCA"),
+    "R": ("CGT", "CGC", "CGG", "CGA", "AGA", "AGG"),
+    "N": ("AAC", "AAT"),
+    "D": ("GAT", "GAC"),
+    "C": ("TGC", "TGT"),
+    "Q": ("CAG", "CAA"),
+    "E": ("GAA", "GAG"),
+    "G": ("GGC", "GGT", "GGG", "GGA"),
+    "H": ("CAT", "CAC"),
+    "I": ("ATC", "ATT", "ATA"),
+    "L": ("CTG", "TTA", "TTG", "CTC", "CTT", "CTA"),
+    "K": ("AAA", "AAG"),
+    "M": ("ATG",),
+    "F": ("TTT", "TTC"),
+    "P": ("CCG", "CCA", "CCT", "CCC"),
+    "S": ("AGC", "TCT", "TCC", "AGT", "TCG", "TCA"),
+    "T": ("ACC", "ACG", "ACT", "ACA"),
+    "W": ("TGG",),
+    "Y": ("TAT", "TAC"),
+    "V": ("GTG", "GTT", "GTC", "GTA"),
+    "*": ("TAA", "TGA", "TAG"),
+}
+
+#: The tables a caller can choose between, by the name the screen shows.
+TABLES: dict[str, dict[str, tuple[str, ...]]] = {
+    "scerevisiae": SCEREVISIAE,
+    "ecoli": ECOLI,
+}
+
+TABLE_NAMES: dict[str, str] = {
+    "scerevisiae": "S. cerevisiae",
+    "ecoli": "E. coli",
+}
+
+#: The default, this being a yeast toolkit.
+CODONS = SCEREVISIAE
+
 #: Residues that carry no information about which codon to use.
 AMBIGUOUS = {"X", "B", "Z", "J", "U", "O"}
+
+
+def get_table(name: str | None) -> dict[str, tuple[str, ...]]:
+    """One codon table by name, defaulting to yeast."""
+    if not name:
+        return SCEREVISIAE
+    try:
+        return TABLES[name.lower().replace(".", "").replace(" ", "")]
+    except KeyError:
+        raise ValueError(
+            f"unknown codon table: {name}. Known: {', '.join(sorted(TABLES))}"
+        ) from None
 
 
 class BackTranslationError(ValueError):
@@ -93,6 +151,7 @@ def back_translate(
     protein: str,
     avoid: tuple[Enzyme, ...] = (),
     stop: str | None = None,
+    table: dict[str, tuple[str, ...]] | None = None,
 ) -> tuple[str, list[int]]:
     """Write `protein` as DNA, never spelling a site for anything in `avoid`.
 
@@ -102,11 +161,12 @@ def back_translate(
 
     `stop` appends a stop codon when the protein does not carry one.
     """
+    codons = table or SCEREVISIAE
     residues = clean_protein(protein)
     if not residues:
         raise BackTranslationError("no protein sequence given")
 
-    unknown = sorted({r for r in residues if r not in CODONS})
+    unknown = sorted({r for r in residues if r not in codons})
     if unknown:
         raise BackTranslationError(
             f"cannot write {', '.join(unknown)} as DNA"
@@ -131,7 +191,7 @@ def back_translate(
             )
         budget -= 1
 
-        options = CODONS[residues[index]]
+        options = codons[residues[index]]
         start = picked[index] if index < len(picked) else 0
         sequence = "".join(out)
         choice = next(
@@ -169,7 +229,12 @@ def back_translate(
 
 def translate(dna: str) -> str:
     """The protein a coding sequence spells, for checking a round trip."""
-    table = {codon: residue for residue, codons in CODONS.items() for codon in codons}
+    table = {
+        codon: residue
+        for source in (SCEREVISIAE, ECOLI)
+        for residue, group in source.items()
+        for codon in group
+    }
     # the synonymous table above is not the whole genetic code; fill the rest
     for codon, residue in _REST.items():
         table.setdefault(codon, residue)

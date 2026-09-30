@@ -27,7 +27,8 @@
         <div class="guide-body">
         <span>This is the <b>only screen that uses the network</b>. Everything else reads your own folder of GenBank files and works offline.</span>
         <span>The DNA is <b>chosen codon by codon</b>, never using a codon that would spell a BsaI, BsmBI, BbsI or NotI site. That is not the same as domesticating afterwards &mdash; a synonymous change made to remove one site can spell another two codons along.</span>
-        <span>Codons follow the <b>classical <i>S. cerevisiae</i> preference</b> for highly expressed genes. Where the preferred codon would spell a site, the next one is used; those positions are counted for you.</span>
+        <span>Codon usage defaults to <b><i>S. cerevisiae</i></b>; pick <b><i>E. coli</i></b> for a part you will express there. Both are the classical preferred-codon orderings for highly expressed genes &mdash; an ordering, not a frequency table, so no CAI is claimed.</span>
+        <span>Untick an enzyme to <b>allow</b> its site. Useful when the part is going somewhere that never sees that enzyme, and the alternative is a run of rare codons.</span>
         <span>The result is a <b>gene to order</b>, not the organism&rsquo;s own sequence. Take it to the Part plasmid screen to add the BsaI ends.</span>
         </div>
       </details>
@@ -48,6 +49,18 @@
           <button class="btn btn-primary" type="button" id="go">Search</button>
         </div>
         <span class="card-note" id="status">&nbsp;</span>
+
+        <div class="opts">
+          <div class="opt">
+            <label class="lbl" for="codon-table">Codon usage</label>
+            <select id="codon-table"></select>
+          </div>
+          <div class="opt opt-grow">
+            <span class="lbl">Keep these sites out of the sequence</span>
+            <div class="enzymes" id="enzymes"></div>
+          </div>
+        </div>
+
         <div id="results" class="results"></div>
       </section>
 
