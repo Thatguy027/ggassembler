@@ -1,0 +1,68 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run pointless. Cancel it
+# rather than queueing behind it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13"]
+        include:
+          # One macOS run, because that is what the app is developed on and
+          # the sharing tests drive a real git: path handling and case
+          # sensitivity differ, and the difference only shows up on a runner.
+          - os: macos-latest
+            python: "3.13"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Identify git for the sharing tests
+        # tests/test_sync.py drives real repositories and makes real commits.
+        # A runner has no global identity, so `git commit` fails with "please
+        # tell me who you are" - and it fails inside a fixture, where the
+        # message is easy to mistake for a bug in the code under test.
+        run: |
+          git config --global user.email "ci@example.invalid"
+          git config --global user.name "CI"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --all-extras --dev --python ${{ matrix.python }}
+      - run: uv run --python ${{ matrix.python }} pytest -q
+
+  wheel:
+    # The build broke once by shipping web/ twice and nobody noticed, because
+    # nothing ever built it. Building is the test for that.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - run: uv build
+
+      - name: The front end has to be in the wheel
+        # A wheel that installs and then serves no HTML is the failure this
+        # catches: the package is importable, the app starts, every screen 404s.
+        run: |
+          uv run --no-project --with ./dist/*.whl python - <<'PY'
+          from ggassembler.api.main import SCREENS, WEB
+          missing = [f for f in set(SCREENS.values()) if not (WEB / f / "index.html").exists()]
+          assert not missing, f"screens missing from the wheel: {missing}"
+          assert (WEB / "tokens.css").exists(), "tokens.css missing from the wheel"
+          print(f"ok: {len(set(SCREENS.values()))} screens, {len(list(WEB.rglob('*')))} web files")
+          PY

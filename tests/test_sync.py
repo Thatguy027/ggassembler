@@ -255,3 +255,86 @@ def test_the_build_log_is_set_to_merge_rather_than_conflict(lab):
     repo = sync.repo_of(lab)
     sync.prepare(lab, repo)
     assert "builds.jsonl merge=union" in (repo / ".gitattributes").read_text()
+
+
+# --------------------------------------------------------------- onboarding ---
+
+
+def test_cloning_a_library_gets_someone_from_nothing_to_working(lab, tmp_path):
+    """The step that stops people: installed the app, no plasmids to open."""
+    into = sync.clone(str(sync.repo_of(lab)), tmp_path / "newcomer")
+    arrived = Library(into / "plasmids")
+    arrived.scan()
+    assert len(arrived.entries) == len(lab.entries)
+
+
+def test_cloning_refuses_to_write_into_somebody_elses_folder(lab, tmp_path):
+    busy = tmp_path / "busy"
+    busy.mkdir()
+    (busy / "notes.txt").write_text("mine", encoding="utf-8")
+    with pytest.raises(sync.SyncError, match="not empty"):
+        sync.clone(str(sync.repo_of(lab)), busy)
+    assert (busy / "notes.txt").read_text() == "mine"
+
+
+@pytest.mark.parametrize("refusal", [
+    "ERROR: Repository not found.\nfatal: Could not read from remote repository.",
+    "git@github.com: Permission denied (publickey).",
+    "fatal: Authentication failed for 'https://github.com/org/library.git/'",
+    "Please make sure you have the correct access rights",
+])
+def test_every_way_github_says_no_leads_to_the_same_advice(refusal):
+    """git's own wording for this talks about public keys and shell access. A
+    lab member who has never pushed anything needs to be told to set up their
+    GitHub access, which is the one thing that message never says."""
+    said = sync.clone_failure("git@github.com:org/library.git", refusal)
+    assert "no key on your account" in said
+    assert "gh auth login" in said
+    assert refusal.splitlines()[0] in said, "git's own words were thrown away"
+
+
+def test_an_ordinary_failure_is_passed_through_unchanged(lab, tmp_path):
+    """Not every failure is an access problem, and dressing a disk error up as
+    one would send somebody to go and fix their SSH keys for nothing."""
+    said = sync.clone_failure("u", "fatal: destination path exists and is not an empty directory")
+    assert "gh auth login" not in said
+    assert said.startswith("fatal:")
+
+
+def run_init(*argv) -> int:
+    from ggassembler.cli import build_parser, cmd_init
+    return cmd_init(build_parser().parse_args(["init", *argv]))
+
+
+def test_init_leaves_a_plain_folder_ready_to_share(lab, capsys):
+    """Run against a library that is already there, it is the three commands
+    nobody should have to be told: ignore the index, merge the build log,
+    agree a baseline."""
+    repo = sync.repo_of(lab)
+    (repo / ".gitattributes").unlink()
+    baseline.path_for(lab).unlink()
+
+    assert run_init(str(lab.roots[0])) == 0
+    assert "merge=union" in (repo / ".gitattributes").read_text()
+    assert baseline.read(lab) is not None
+    assert "Start the app with" in capsys.readouterr().out
+
+
+def test_init_is_safe_to_run_twice(lab):
+    assert run_init(str(lab.roots[0])) == 0
+    assert run_init(str(lab.roots[0])) == 0
+
+
+def test_init_does_not_overwrite_an_agreed_baseline(lab):
+    """Re-baselining is how the gate stops objecting, so it has to stay a
+    thing somebody did on purpose - never a side effect of running setup."""
+    import json
+    before = json.loads(baseline.path_for(lab).read_text())
+    write_genbank(synth.plasmid_without_bsai(name="pNew"), lab.roots[0] / "pNew.gb")
+    run_init(str(lab.roots[0]))
+    assert json.loads(baseline.path_for(lab).read_text()) == before
+
+
+def test_init_on_a_folder_that_is_not_there_says_how_to_clone_one(tmp_path, capsys):
+    assert run_init(str(tmp_path / "nothing-here")) == 2
+    assert "--from" in capsys.readouterr().err

@@ -282,3 +282,66 @@ def share(library: Library, message: str, force: bool = False) -> tuple[Status, 
         run(found.repo, "commit", "--quiet", "-m", message)
     run(found.repo, "push", found.remote, f"HEAD:{found.branch}")
     return status(library), verdict
+
+
+#: What git says when the remote is there but you are not allowed in. Matched
+#: so the app can answer the actual question - "set up your GitHub access" -
+#: rather than passing on a sentence about public keys and shell access.
+DENIED = (
+    "permission denied",
+    "could not read from remote repository",
+    "authentication failed",
+    "repository not found",
+    "access rights",
+)
+
+
+def clone(url: str, into: Path) -> Path:
+    """Clone an organisation's library, or say why not in words.
+
+    This is where a new person meets git for the first time, and it is the
+    step most likely to stop them: a lab member who has never pushed anything
+    has no key on their account, and git's own message for that talks about
+    public keys and shell access rather than about what to do next.
+    """
+    if not git_available():
+        raise SyncError(
+            "git is not installed. Install it (on macOS, `xcode-select --install`) "
+            "and run this again."
+        )
+    into = Path(into).expanduser().resolve()
+    if into.exists() and any(into.iterdir()):
+        raise SyncError(f"{into} already exists and is not empty")
+
+    into.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        done = subprocess.run(
+            ["git", "clone", url, str(into)],
+            capture_output=True, text=True, timeout=TIMEOUT * 5,
+        )
+    except subprocess.TimeoutExpired:
+        raise SyncError(f"cloning {url} took too long - check the network") from None
+
+    if done.returncode != 0:
+        raise SyncError(clone_failure(url, (done.stderr or done.stdout).strip()))
+    return into
+
+
+def clone_failure(url: str, message: str) -> str:
+    """Turn git's refusal into something a bench scientist can act on.
+
+    Separated from `clone` so the wording is reachable without a network and a
+    repository nobody can read: the message is the feature here, and a feature
+    only testable by failing to reach GitHub is a feature nobody tests.
+    """
+    if not any(phrase in message.lower() for phrase in DENIED):
+        return message or f"could not clone {url}"
+    return (
+        f"GitHub would not let you read {url}.\n\n"
+        f"  Either you have no access to it - ask whoever runs the library "
+        f"to add you - or this machine has no key on your account.\n"
+        f"  To check: `ssh -T git@github.com`.\n"
+        f"  To fix:   `gh auth login`, or add an SSH key at "
+        f"https://github.com/settings/keys\n\n"
+        f"git said: {message}"
+    )

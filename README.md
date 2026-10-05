@@ -5,14 +5,28 @@ Toolkit (YTK) standard of Lee, DeLoache, Cervantes & Dueber, *ACS Synth. Biol.*
 2015.
 
 Point it at a folder of GenBank files. It works out what each plasmid **is** by
-simulating the restriction digest, then drives six screens: part construction,
+simulating the restriction digest, then drives seven screens: part construction,
 cassette assembly, multigene assembly, a library index, a protein search that
-writes a gene you can order, and a check of what came back from sequencing.
+writes a gene you can order, a plate that builds ninety-six cassettes at once,
+and a check of what came back from sequencing.
 
 ```sh
 uv sync
 uv run ggasm serve ../goldengateR/inst/extdata/plasmids
 ```
+
+Joining a lab that already has a library, with nothing on your machine yet:
+
+```sh
+ggasm init plasmids --from git@github.com:<org>/<library>.git
+ggasm serve plasmids
+```
+
+`init` clones it, tells the repository to ignore the index and merge the build
+log, and agrees a baseline if there is not one. It is the three commands nobody
+should have to be told twice, and the one place where GitHub access is likely
+to stop someone - so when it does, it says to run `gh auth login` rather than
+passing on git's sentence about public keys.
 
 Opens on <http://127.0.0.1:8737>. Several folders scan as one library:
 
@@ -128,6 +142,13 @@ keep out, defaulting to the scheme's own. Unticking one is a real choice: if
 the part will never meet that enzyme, avoiding it is not worth a run of rare
 codons. The result is a gene to order, not the organism's own sequence.
 
+**Plate** — the same cassette built ninety-six ways. Pick a factor for the rows
+and one for the columns, and every well is a real assembly checked before it is
+costed, not a label. Carries a source-plate map of what is physically in which
+well, the reaction maths, a plate map .csv, and an Opentrons Flex protocol that
+was validated by running `opentrons_simulate` against it rather than by reading
+the docs.
+
 **Sequencing** — the clones a vendor sent back, checked against the plasmid
 they were meant to be. A whole-plasmid read starts at an arbitrary base and is
 as often as not on the opposite strand; neither is a difference, so each clone
@@ -201,7 +222,7 @@ few bases off.
 ## Test
 
 ```sh
-uv run pytest        # 979 tests
+uv run pytest        # 990 tests, on 3.11, 3.12 and 3.13 in CI
 ```
 
 Several exist because of a specific bug and say so. A few examples: an

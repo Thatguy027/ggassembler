@@ -1057,7 +1057,10 @@ def design(
                 INFO, "try_instead",
                 f"{len(workable)} other destination vector(s) can close a chain of "
                 f"{len(units)}: {', '.join(workable[:6])}"
-                f"{'\u2026' if len(workable) > 6 else ''}",
+                # The ellipsis is bound first because a backslash inside an
+                # f-string expression is a syntax error before 3.12, and the
+                # package claims to support 3.11.
+                + ("\u2026" if len(workable) > 6 else ""),
             ))
         else:
             report.issues.append(Issue(

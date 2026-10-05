@@ -51,6 +51,13 @@ def build_parser() -> argparse.ArgumentParser:
                        help="write the current state as the new baseline and exit 0")
     check.add_argument("--no-recursive", dest="recursive", action="store_false")
 
+    init = sub.add_parser(
+        "init", help="set up a plasmid library on this machine, ready to share")
+    init.add_argument("folder", type=Path, nargs="?", default=Path("plasmids"),
+                      help="where the library lives, or should be cloned to")
+    init.add_argument("--from", dest="url", default=None, metavar="URL",
+                      help="clone your lab's library from this git remote")
+
     serve = sub.add_parser("serve", help="start the app and open it in a browser")
     serve.add_argument("folder", type=Path, nargs="+", help="library folder(s) to index")
     serve.add_argument("--port", type=int, default=8737)
@@ -124,6 +131,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_build(args)
     if args.command == "check":
         return cmd_check(args)
+    if args.command == "init":
+        return cmd_init(args)
     if args.command == "serve":
         return cmd_serve(args)
     parser.print_help()
@@ -259,6 +268,52 @@ def cmd_build(args: argparse.Namespace) -> int:
     if args.out:
         write_genbank(result.product, args.out)
         print(f"\nwrote {args.out}")
+    return 0
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """Get someone from nothing to a working, shareable library.
+
+    The step this exists for is the one that stops people: a new lab member
+    installs the app and has no plasmids to point it at, and the answer -
+    clone this URL, then make sure the index is ignored and the build log is
+    set to merge - is three commands nobody should have to be told twice.
+    """
+    from .core import baseline, sync
+
+    folder = args.folder
+    if args.url:
+        try:
+            folder = sync.clone(args.url, folder)
+        except sync.SyncError as exc:
+            print(f"\n{exc}\n", file=sys.stderr)
+            return 2
+        print(f"cloned into {folder}")
+    elif not folder.is_dir():
+        print(f"not a folder: {folder}\n\nTo clone your lab's library instead:\n"
+              f"  ggasm init {folder} --from git@github.com:<org>/<library>.git",
+              file=sys.stderr)
+        return 2
+
+    library = Library(folder)
+    library.scan()
+    print(f"  {len(library.entries)} plasmids, "
+          f"{sum(1 for e in library.sorted_entries() if e.is_part)} usable parts")
+
+    repo = sync.repo_of(library)
+    if repo is not None:
+        changed = sync.prepare(library, repo)
+        print(f"  taught the repository to ignore the index and merge the build log"
+              if changed else "  the repository already knows how to share this")
+
+    if baseline.read(library) is None:
+        state = baseline.write(library)
+        print(f"  recorded a baseline: {len(state['conflicts'])} conflicts, "
+              f"{len(state['unrecognised'])} unrecognised, agreed as known")
+
+    status = sync.status(library)
+    print(f"\nsharing: {status.summary()}")
+    print(f"\nStart the app with:\n  ggasm serve {folder}")
     return 0
 
 
