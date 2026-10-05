@@ -20,8 +20,12 @@ ggasm init ytk --starter
 ggasm serve ytk
 ```
 
-Opens <http://127.0.0.1:8737>. That is the whole setup — everything below is
-detail you can read when you need it.
+The third command opens `http://127.0.0.1:8737` in your browser. That is the
+whole setup — everything below is detail you can read when you need it.
+
+That address is not a link to anywhere: `127.0.0.1` means *this machine*, so it
+only resolves once you are running the server yourself. There is nothing to
+visit until you do.
 
 | | |
 |---|---|
@@ -76,7 +80,7 @@ should have to be told twice, and the one place where GitHub access is likely
 to stop someone - so when it does, it says to run `gh auth login` rather than
 passing on git's sentence about public keys.
 
-Opens on <http://127.0.0.1:8737>. Several folders scan as one library:
+Serves on `http://127.0.0.1:8737`. Several folders scan as one library:
 
 ```sh
 uv run ggasm serve ..          # every plasmid in the project
