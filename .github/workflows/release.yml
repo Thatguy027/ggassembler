@@ -19,6 +19,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
 
+      - name: The tag has to be the version being published
+        # Nothing otherwise connects them: tagging v0.2.0 while pyproject still
+        # says 0.1.0 publishes 0.1.0, and the tag that claims to point at the
+        # release points at nothing of the kind. PyPI will not let either be
+        # corrected later.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in pyproject.toml"
+            exit 1
+          fi
+          echo "tag $GITHUB_REF_NAME matches version $version"
+
       - run: uv build
 
       - name: Nothing goes out that the tests have not passed
