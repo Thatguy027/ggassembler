@@ -13,7 +13,7 @@ Python rules
 
 Front-end rules
     web/<level>/ imports nothing from a sibling level directory and fetches only
-                 its own /api/<level>/* plus the shared /api/library* endpoints
+                 its own /api/<level>/* plus the shared endpoints in SHARED_API
     web/         holds no shared script or stylesheet other than tokens.css
 """
 
@@ -26,6 +26,12 @@ from pathlib import Path
 PKG = Path(__file__).resolve().parent.parent / "ggassembler"
 WEB = PKG / "web"
 LEVEL_DIRS = ("level1", "level2", "level3")
+
+#: Endpoints any screen may call. They qualify by the same test the Library
+#: endpoints always passed: the router behind them imports no level, so calling
+#: one cannot couple two screens to each other. Sharing a plasmid library is a
+#: property of the library, not of whatever screen you happened to be on.
+SHARED_API = ("/api/library", "/api/sync")
 
 
 # --------------------------------------------------------------------------- #
@@ -195,7 +201,7 @@ def test_the_library_screen_uses_only_shared_endpoints():
     api_re = re.compile(r"""['"`](/api/[A-Za-z0-9_\-/{}$.]*)""")
     for path in sorted((WEB / "library").rglob("*.js")):
         for url in api_re.findall(path.read_text(encoding="utf-8")):
-            if not url.startswith("/api/library"):
+            if not url.startswith(SHARED_API):
                 offences.append(f"web/library/{path.name}: calls {url}, not a shared endpoint")
     assert not offences, "library screen reached into a level:\n" + "\n".join(offences)
 
@@ -211,7 +217,7 @@ def test_the_sequencing_screen_uses_only_its_own_and_shared_endpoints():
     api_re = re.compile(r"""['"`](/api/[A-Za-z0-9_\-/{}$.]*)""")
     for path in sorted((WEB / "sequencing").rglob("*.js")):
         for url in api_re.findall(path.read_text(encoding="utf-8")):
-            if url.startswith("/api/sequencing") or url.startswith("/api/library"):
+            if url.startswith(("/api/sequencing", *SHARED_API)):
                 continue
             offences.append(f"web/sequencing/{path.name}: calls {url}")
     assert not offences, "sequencing screen reached outside its own API:\n" + "\n".join(offences)
@@ -260,7 +266,7 @@ def test_web_levels_fetch_only_their_own_endpoints():
     for own in LEVEL_DIRS:
         for path in sorted((WEB / own).rglob("*.js")):
             for url in api_re.findall(path.read_text(encoding="utf-8")):
-                if url.startswith("/api/library") or url.startswith(f"/api/{own}"):
+                if url.startswith((*SHARED_API, f"/api/{own}")):
                     continue
                 rel = path.relative_to(WEB)
                 offences.append(f"web/{rel}: calls {url}, outside /api/{own} and /api/library")
@@ -401,10 +407,13 @@ def test_no_button_in_the_markup_is_left_without_a_handler():
     offences = []
     for directory in sorted(p for p in WEB.iterdir() if p.is_dir()):
         html = directory / "index.html"
-        script = directory / f"{directory.name}.js"
-        if not html.exists() or not script.exists():
+        scripts = sorted(directory.glob("*.js"))
+        if not html.exists() or not scripts:
             continue
-        source = script.read_text(encoding="utf-8")
+        # Every script in the screen's folder, not just the one named after it.
+        # A screen may split its code across files - the handler for a button
+        # is as likely to be in the module that owns that feature.
+        source = "\n".join(p.read_text(encoding="utf-8") for p in scripts)
         for button_id in re.findall(r'<button[^>]*\bid="([^"]+)"', html.read_text("utf-8")):
             # The id has to appear *near* an addEventListener. Merely being
             # mentioned is what the dead Protocol button already managed:

@@ -209,3 +209,97 @@ td.more {
   text-align: center;
 }
 td.more.is-button { cursor: pointer; text-decoration: underline; }
+
+/* ---------------------------------------------------------------- sharing ---
+ *
+ * Colour never carries the message on its own: the dot changes colour, and the
+ * sentence beside it says the same thing in words. Someone who cannot tell
+ * amber from green still reads "3 of yours not shared".
+ */
+
+.sync {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.sync-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sync-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--ink-3);
+}
+
+.sync[data-tone="ok"]  .sync-dot { background: var(--ok, #2E7D49); }
+.sync[data-tone="due"] .sync-dot { background: var(--warn); }
+.sync[data-tone="bad"] .sync-dot { background: var(--bad, #B3261E); }
+.sync[data-tone="off"] .sync-dot { background: var(--ink-3); }
+
+.sync-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* Takes the slack so the switch and the button stay together on the right
+   * and do not drift apart as the summary text changes length. */
+  flex: 1 1 auto;
+}
+
+.sync-summary { font-size: 0.95rem; }
+
+.sync-where {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-switch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sync-last {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+
+.sync-last[data-ok="false"] { color: var(--bad, #B3261E); }
+
+.sync-problems {
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+
+.sync-problems > summary {
+  cursor: pointer;
+  color: var(--warn);
+}
+
+.sync-problems ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--ink-2);
+}
+
+.sync-problems li { margin: 3px 0; }
+
+@media (max-width: 720px) {
+  /* The switch wraps to its own line before the summary starts truncating:
+   * the thing you came to read should not be the thing that gets cut. */
+  .sync-words { flex-basis: 100%; }
+}

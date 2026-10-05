@@ -6,8 +6,10 @@
  * would be slower and worse.
  *
  * The one thing this screen writes is a manual type assignment, which the
- * server stores in .ggasm/overrides.json and which always beats detection.
+ * server stores under ggasm/overrides/ and which always beats detection.
  */
+
+import { startSync } from './sync.js';
 
 const state = { rows: [], types: [], filter: '', type: '', confidence: '' };
 
@@ -492,3 +494,7 @@ el('assign-save').addEventListener('click', () => saveAssign(el('assign-type').v
 el('assign-clear').addEventListener('click', () => saveAssign(null));
 
 load();
+
+/* A sync pulls in whatever colleagues added, so the table has to be re-read
+ * afterwards or the screen shows a library one sync out of date. */
+startSync(load);

@@ -9,11 +9,12 @@ from __future__ import annotations
 import io
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from ..core.assembly import AssemblyResult
+from . import routes_sync
 from ..core.library import Library, remap_features
 from ..core import protocol
 from ..core.seqio import write_genbank
@@ -440,7 +441,7 @@ def export(request: Request, body: DesignRequest) -> PlainTextResponse:
 
 
 @router.post("/save")
-def save(request: Request, body: DesignRequest) -> dict[str, Any]:
+def save(request: Request, body: DesignRequest, tasks: BackgroundTasks) -> dict[str, Any]:
     """Write the product into the library folder and re-index it."""
     library = get_library(request)
     design = body.to_design()
@@ -451,4 +452,5 @@ def save(request: Request, body: DesignRequest) -> dict[str, Any]:
     path = library.folder / f"{design.name}.gb"
     write_genbank(result.product, path)
     library.scan()
+    routes_sync.after_save(request, tasks, f"add {design.name}")
     return {"ok": True, "path": str(path), "name": design.name}

@@ -29,6 +29,39 @@ routes it started with. `--reload` restarts it when a `.py` file changes:
 uv run ggasm serve ../goldengateR/inst/extdata/plasmids --reload
 ```
 
+## Sharing a library with a lab
+
+A library folder holds two unrelated things, and they belong on opposite sides
+of a `.gitignore`:
+
+| | What it is | Shared |
+|---|---|---|
+| `.ggasm/` | the index, keyed on mtimes, and this person's settings | no - it differs on every machine and would conflict on every pull |
+| `ggasm/`  | overrides, saved designs, the build log, the baseline | **yes** - nothing can recompute a concentration measured at a bench |
+
+Both sit beside the library unless `--cache-dir` / `--data-dir` say otherwise,
+which matters when several roots are scanned as one library: their default
+location is whatever ancestor the roots share.
+
+Sharing itself is git. The library folder is already a repository - for this
+lab, [ggassembler-library](https://github.com/Thatguy027/ggassembler-library) -
+so one private repository per organisation gives privacy between organisations with no
+server to run and nobody's unpublished constructs on someone else's
+infrastructure. The Library screen carries the control - **Share my plasmids
+with the lab**, on by default - and switching it off stops publishing without
+stopping you receiving, because working against a library you know to be stale
+is how an assembly gets repeated.
+
+Before anything is published it is checked against `ggasm/baseline.json`, the
+same gate `ggasm check` applies: a change is judged by the problems it *adds*,
+never by the absolute state. A library of several hundred files always carries
+some conflicts, and a gate that demands they all be fixed first is a gate that
+gets switched off in a week.
+
+Overrides and designs are one file each so that two people curating two
+plasmids touch two files, and the build log is one JSON object per line with
+`merge=union` set, so concurrent appends merge instead of conflicting.
+
 ## The idea it rests on
 
 **What a plasmid is gets decided by the enzymes, never by its name or its
@@ -168,7 +201,7 @@ few bases off.
 ## Test
 
 ```sh
-uv run pytest        # 660 tests
+uv run pytest        # 979 tests
 ```
 
 Several exist because of a specific bug and say so. A few examples: an

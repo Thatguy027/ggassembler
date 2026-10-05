@@ -23,7 +23,7 @@ import json
 import os
 import re
 from dataclasses import asdict, dataclass, field, replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Sequence
 
 from Bio.SeqRecord import SeqRecord
@@ -33,14 +33,26 @@ from .enzymes import Enzyme, Fragment, Site, digest, find_sites
 from .assembly import Piece
 from .parttypes import YTK, Scheme, color_for, span
 
+#: Derived state: an index that can be thrown away and rebuilt from the files.
+#: Keyed on mtime, so it differs on every machine and must never be shared.
 CACHE_DIR = ".ggasm"
 INDEX_FILE = "index.json"
-OVERRIDES_FILE = "overrides.json"
-DESIGNS_FILE = "designs.json"
+SETTINGS_FILE = "settings.json"
+INDEX_VERSION = 11
+
+#: Lab data: what people decided, not what the app worked out. Shared, so a
+#: colleague's curation arrives with their plasmids rather than being lost.
+#: Undotted on purpose - it is visible in a folder listing because it is worth
+#: knowing it is there, and the dot is reserved for what is disposable.
+DATA_DIR = "ggasm"
+OVERRIDES_DIR = "overrides"
+DESIGNS_DIR = "designs"
 BUILDS_FILE = "builds.jsonl"
 EXPECTED_DIR = "expected"
-CONFIG_FILE = "config.json"
-INDEX_VERSION = 11
+
+#: Where the old single-file state lived, read once and migrated.
+LEGACY_OVERRIDES = "overrides.json"
+LEGACY_DESIGNS = "designs.json"
 
 #: Confidence levels, best first.
 DIGEST, ANNOTATION, FILENAME, NONE = "digest", "annotation", "filename", "none"
@@ -56,9 +68,13 @@ PART, ENTRY_VECTOR, CONNECTOR, CASSETTE, MULTIGENE_VECTOR = (
 ARCHIVE_DIR = "_archive"
 
 SKIP_DIRS = {
-    CACHE_DIR, ARCHIVE_DIR, ".git", ".venv", "venv", "__pycache__",
+    CACHE_DIR, DATA_DIR, ARCHIVE_DIR, ".git", ".venv", "venv", "__pycache__",
     "node_modules", ".Rproj.user",
 }
+# DATA_DIR is in there for a reason that is easy to undo by accident: it holds
+# `expected/`, the predicted sequence of every construct the app has designed.
+# Those are .gb files sitting under a scanned root, so without this line the
+# library indexes its own predictions as if someone had cloned them.
 
 #: Names that say a sequence was checked by sequencing. Between two identical
 #: files that is the one worth keeping, whatever it is called - the shortest
@@ -1101,6 +1117,7 @@ class Library:
         recursive: bool = True,
         scheme: Scheme = YTK,
         cache_dir: str | Path | None = None,
+        data_dir: str | Path | None = None,
     ):
         if isinstance(roots, (str, Path)):
             roots = [roots]
@@ -1111,6 +1128,7 @@ class Library:
         self.scheme = scheme
         self.base = self._common_base()
         self._cache_dir = Path(cache_dir).expanduser().resolve() if cache_dir else None
+        self._data_dir = Path(data_dir).expanduser().resolve() if data_dir else None
         self.entries: dict[str, PlasmidEntry] = {}
         self.errors: dict[str, str] = {}
         self._cache: dict[str, dict[str, Any]] = {}
@@ -1132,15 +1150,46 @@ class Library:
 
     @property
     def cache_dir(self) -> Path:
+        """Derived state. Safe to delete; costs a rescan."""
         return self._cache_dir or (self.base / CACHE_DIR)
+
+    @property
+    def data_dir(self) -> Path:
+        """Lab data. Deleting it loses work nothing can recompute."""
+        return self._data_dir or (self.base / DATA_DIR)
 
     @property
     def index_path(self) -> Path:
         return self.cache_dir / INDEX_FILE
 
     @property
-    def overrides_path(self) -> Path:
-        return self.cache_dir / OVERRIDES_FILE
+    def settings_path(self) -> Path:
+        """Per-person, per-machine preferences - never shared.
+
+        Whether this person syncs is theirs to decide. Put it in the shared
+        directory and one person switching sync off switches it off for the
+        whole lab, which is invisible until somebody's month of work turns out
+        never to have left their laptop.
+        """
+        return self.cache_dir / SETTINGS_FILE
+
+    def settings(self) -> dict[str, Any]:
+        """This person's preferences on this machine."""
+        return self._read_json(self.settings_path)
+
+    def set_setting(self, key: str, value: Any) -> dict[str, Any]:
+        current = self.settings()
+        current[key] = value
+        self._write_json(self.settings_path, current)
+        return current
+
+    @property
+    def overrides_dir(self) -> Path:
+        return self.data_dir / OVERRIDES_DIR
+
+    @property
+    def legacy_overrides_path(self) -> Path:
+        return self.cache_dir / LEGACY_OVERRIDES
 
     def files(self) -> list[Path]:
         pattern = "**/*" if self.recursive else "*"
@@ -1392,11 +1441,13 @@ class Library:
 
     def _store_override(self, relpath: str, record: dict[str, Any]) -> None:
         """Write one override record back, dropping it when nothing is left."""
+        path = self._override_path(relpath)
         if record:
             self.overrides[relpath] = record
+            self._write_json(path, {"path": relpath, **record})
         else:
             self.overrides.pop(relpath, None)
-        self._write_json(self.overrides_path, self.overrides)
+            path.unlink(missing_ok=True)
         cached = self._cache.get(relpath)
         if relpath in self.entries and cached:
             self.entries[relpath] = self._apply_override(PlasmidEntry.from_dict(cached["entry"]))
@@ -1690,7 +1741,7 @@ class Library:
 
     @property
     def builds_path(self) -> Path:
-        return self.cache_dir / BUILDS_FILE
+        return self.data_dir / BUILDS_FILE
 
     def log_build(
         self,
@@ -1727,7 +1778,7 @@ class Library:
             ],
             "issues": list(issues),
         }
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.builds_path.parent.mkdir(parents=True, exist_ok=True)
         with self.builds_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record) + "\n")
         return record
@@ -1750,8 +1801,40 @@ class Library:
     # -- saved designs ----------------------------------------------------- #
 
     @property
-    def designs_path(self) -> Path:
-        return self.cache_dir / DESIGNS_FILE
+    def designs_dir(self) -> Path:
+        return self.data_dir / DESIGNS_DIR
+
+    @property
+    def legacy_designs_path(self) -> Path:
+        return self.cache_dir / LEGACY_DESIGNS
+
+    def _design_path(self, level: str, name: str) -> Path:
+        """One file per design, under the level that made it."""
+        return self.designs_dir / _slug(level) / f"{_slug(name)}.json"
+
+    def _migrate_designs(self) -> None:
+        legacy = self.legacy_designs_path
+        if not legacy.exists():
+            return
+        for record in self._read_json(legacy).get("designs", []):
+            level, name = record.get("level", ""), record.get("name", "")
+            if not name:
+                continue
+            path = self._design_path(level, name)
+            if not path.exists():
+                self._write_json(path, record)
+        legacy.rename(legacy.with_suffix(".json.migrated"))
+
+    def _read_designs(self) -> list[dict[str, Any]]:
+        self._migrate_designs()
+        if not self.designs_dir.is_dir():
+            return []
+        out = []
+        for path in sorted(self.designs_dir.rglob("*.json")):
+            record = self._read_json(path)
+            if record.get("name"):
+                out.append(record)
+        return out
 
     def designs(self, level: str | None = None) -> list[dict[str, Any]]:
         """Every saved design, newest first.
@@ -1762,7 +1845,7 @@ class Library:
         index rather than in it, because it describes what you are building
         rather than what is on the shelf.
         """
-        saved = self._read_json(self.designs_path).get("designs", [])
+        saved = self._read_designs()
         if level:
             saved = [d for d in saved if d.get("level") == level]
         return sorted(saved, key=lambda d: d.get("saved_at", ""), reverse=True)
@@ -1781,31 +1864,22 @@ class Library:
             "saved_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
             "design": design,
         }
-        data = self._read_json(self.designs_path)
-        kept = [
-            d for d in data.get("designs", [])
-            if not (d.get("level") == level and d.get("name") == name)
-        ]
-        data["designs"] = [record, *kept]
-        self._write_json(self.designs_path, data)
+        self._write_json(self._design_path(level, name), record)
         return record
 
     def delete_design(self, level: str, name: str) -> bool:
-        data = self._read_json(self.designs_path)
-        before = data.get("designs", [])
-        after = [
-            d for d in before
-            if not (d.get("level") == level and d.get("name") == name)
-        ]
-        data["designs"] = after
-        self._write_json(self.designs_path, data)
-        return len(after) < len(before)
+        self._migrate_designs()
+        path = self._design_path(level, name)
+        if not path.exists():
+            return False
+        path.unlink()
+        return True
 
     # -- constructs the app predicted -------------------------------------- #
 
     @property
     def expected_dir(self) -> Path:
-        return self.cache_dir / EXPECTED_DIR
+        return self.data_dir / EXPECTED_DIR
 
     def remember_expected(self, name: str, record: SeqRecord, level: str = "") -> Path:
         """Keep the sequence of a construct this app said it would build.
@@ -1819,7 +1893,7 @@ class Library:
         Written into `.ggasm/` rather than the library folder: this is what a
         construct was *meant* to be, not a plasmid anyone has.
         """
-        safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._-") or "construct"
+        safe = _slug(name) or "construct"
         path = self.expected_dir / f"{safe}.gb"
         record = record[:]  # a copy, so annotating it here cannot touch the caller's
         record.annotations.setdefault("molecule_type", "DNA")
@@ -1857,8 +1931,56 @@ class Library:
         except (OSError, ValueError):
             return None
 
+    # -- overrides on disk ------------------------------------------------- #
+    #
+    # One file per plasmid, mirroring the library's own layout, rather than one
+    # dict holding all of them. The dict was the obvious shape and the wrong
+    # one as soon as two people shared a library: every curation decision lands
+    # in the same file, so two colleagues reclassifying two unrelated plasmids
+    # conflict, and resolving that conflict by hand means hand-merging JSON.
+    #
+    # Split per plasmid, they touch different files and git merges them without
+    # being asked. `git log` on one file also becomes the history of what this
+    # plasmid was thought to be, which is worth having on its own.
+
+    def _override_path(self, relpath: str) -> Path:
+        """Where one plasmid's override lives, mirroring its path in the library."""
+        rel = PurePosixPath(relpath)
+        if rel.is_absolute() or ".." in rel.parts:
+            # `relpath` falls back to an absolute path for a file outside the
+            # common base. Mirroring that would write outside the data
+            # directory, so flatten it instead of trusting it.
+            rel = PurePosixPath(rel.name)
+        return self.overrides_dir / f"{rel}.json"
+
     def _load_overrides(self) -> None:
-        self.overrides = self._read_json(self.overrides_path)
+        self._migrate_overrides()
+        found: dict[str, dict[str, Any]] = {}
+        if self.overrides_dir.is_dir():
+            for path in sorted(self.overrides_dir.rglob("*.json")):
+                record = self._read_json(path)
+                key = record.pop("path", None)
+                if isinstance(key, str) and record:
+                    found[key] = record
+        self.overrides = found
+
+    def _migrate_overrides(self) -> None:
+        """Split a pre-split overrides.json into one file per plasmid, once.
+
+        The legacy file is renamed rather than deleted. It holds concentrations
+        measured at a bench that nothing can recompute, and a migration that
+        loses those is worse than one that leaves a stray file behind.
+        """
+        legacy = self.legacy_overrides_path
+        if not legacy.exists():
+            return
+        for relpath, record in (self._read_json(legacy) or {}).items():
+            if not isinstance(record, dict) or not record:
+                continue
+            path = self._override_path(relpath)
+            if not path.exists():
+                self._write_json(path, {"path": relpath, **record})
+        legacy.rename(legacy.with_suffix(".json.migrated"))
 
     @staticmethod
     def _read_json(path: Path) -> dict[str, Any]:
@@ -1871,6 +1993,15 @@ class Library:
     def _write_json(path: Path, data: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _slug(name: str) -> str:
+    """A filename that survives every filesystem and still reads like the name.
+
+    Shared state is reviewed in `git diff`, so the filename has to stay legible:
+    a hash would be unique and tell a reviewer nothing about what changed.
+    """
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._-") or "unnamed"
 
 
 def _same(cached: dict[str, Any], key: dict[str, Any]) -> bool:

@@ -147,12 +147,32 @@
         <summary>What each plasmid is comes from a simulated digest, never from its file name or annotations.</summary>
         <div class="guide-body">
         <span><b>Amber rows need a human</b>: a conflict between the digest and the annotations, an internal site, or nothing the digest could call.</span>
-        <span><b>Click the type pill</b> on any row to assign a type by hand. Manual assignments are stored in <code>.ggasm/overrides.json</code> and always beat detection.</span>
+        <span><b>Click the type pill</b> on any row to assign a type by hand. Manual assignments are stored in <code>ggasm/overrides/</code>, one file per plasmid, and always beat detection. They are shared with your lab alongside the plasmid itself.</span>
         <span><b>Duplicate files are merged.</b> One sequence is one plasmid, and every filename it was found under is listed beneath its name.</span>
         <span>The <b>Component</b> column reads the annotations inside the fragment that plasmid contributes — the part itself, not its vector.</span>
         <span><b>Re-scan</b> after adding files. Only changed files are re-read, so it is near-instant.</span>
         </div>
       </details>
+
+      <section class="sync" id="sync" data-tone="off">
+        <div class="sync-head">
+          <span class="sync-dot" aria-hidden="true"></span>
+          <div class="sync-words">
+            <strong class="sync-summary" id="sync-summary">checking&hellip;</strong>
+            <span class="sync-where" id="sync-where"></span>
+          </div>
+          <label class="sync-switch">
+            <input type="checkbox" id="sync-toggle" checked>
+            <span>Share my plasmids with the lab</span>
+          </label>
+          <button class="btn" type="button" id="sync-now">Sync now</button>
+        </div>
+        <p class="sync-last" id="sync-last" hidden></p>
+        <details class="sync-problems" id="sync-problems" hidden>
+          <summary id="sync-problem-count"></summary>
+          <ul id="sync-problem-list"></ul>
+        </details>
+      </section>
 
       <div class="stats" id="stats"></div>
 
@@ -223,7 +243,7 @@
       <label class="assign-label" for="assign-reason">Why</label>
       <input type="text" id="assign-reason" placeholder="e.g. checked by sequencing">
       <p class="card-note assign-foot">
-        A manual assignment is stored in <code>.ggasm/overrides.json</code> and always
+        A manual assignment is stored in <code>ggasm/overrides/</code> and always
         beats detection.
       </p>
       <div class="assign-actions">

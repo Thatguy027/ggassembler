@@ -8,11 +8,12 @@ from __future__ import annotations
 import io
 from typing import Any
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Request, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from ..core import protocol
+from . import routes_sync
 from ..core.library import Library
 from ..levels import level3_multigene as level3
 
@@ -381,10 +382,11 @@ def export(request: Request, body: DesignRequest) -> PlainTextResponse:
 
 
 @router.post("/save")
-def save(request: Request, body: DesignRequest) -> dict[str, Any]:
+def save(request: Request, body: DesignRequest, tasks: BackgroundTasks) -> dict[str, Any]:
     library = get_library(request)
     result = level3.build(library, body.to_design())
     path = level3.save(library, result, body.name)
     if path is None:
         return {"ok": False, "issues": _payload(result)["issues"]}
+    routes_sync.after_save(request, tasks, f"add {body.name}")
     return {"ok": True, "path": path, "name": body.name}

@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from .core import baseline
 from .core.library import Library, PlasmidEntry
 from .core.seqio import write_genbank
 from .levels import level2_cassette
@@ -57,6 +58,10 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--no-recursive", dest="recursive", action="store_false")
     serve.add_argument("--no-browser", dest="browser", action="store_false",
                        help="do not open a browser tab")
+    serve.add_argument("--cache-dir", type=Path, default=None,
+                       help="where to keep the index (default: .ggasm/ beside the library)")
+    serve.add_argument("--data-dir", type=Path, default=None,
+                       help="where to keep shared curation (default: ggasm/ beside the library)")
     serve.add_argument("--reload", action="store_true",
                        help="restart the server when a .py file in the package changes")
 
@@ -73,7 +78,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     """
     library = Library(args.folder, recursive=args.recursive)
     library.scan()
-    current = _check_state(library)
+    current = baseline.state(library)
 
     if args.update:
         args.baseline.write_text(json.dumps(current, indent=2, sort_keys=True) + "\n",
@@ -108,22 +113,6 @@ def cmd_check(args: argparse.Namespace) -> int:
     print(f"{current['total']} plasmids, nothing new"
           + (f" ({fixed} fewer than the baseline)" if fixed else ""))
     return 0
-
-
-def _check_state(library: Library) -> dict[str, object]:
-    """The facts a baseline records: what is broken, and what it is broken about."""
-    entries = library.unique_entries()
-    return {
-        "total": len(entries),
-        "conflicts": {
-            e.name: e.call.conflict for e in entries if e.call.conflict
-        },
-        "unrecognised": {
-            e.name: e.call.reason
-            for e in entries
-            if e.call.part_type is None and not e.is_assembled
-        },
-    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -292,7 +281,9 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     import uvicorn
 
-    from .api.main import ENV_FOLDERS, ENV_RECURSIVE, PACKAGE, create_app
+    from .api.main import (
+        ENV_CACHE_DIR, ENV_DATA_DIR, ENV_FOLDERS, ENV_RECURSIVE, PACKAGE, create_app,
+    )
 
     for folder in args.folder:
         if not folder.is_dir():
@@ -301,16 +292,25 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     print(f"indexing {', '.join(str(f) for f in args.folder)} ...")
 
+    # Several roots put the default state directories in whatever ancestor the
+    # roots happen to share - which for a public library and a private one is
+    # the home directory, or worse. Layering wants these said out loud.
+    dirs = {"cache_dir": args.cache_dir, "data_dir": args.data_dir}
+    if len(args.folder) > 1 and not (args.cache_dir and args.data_dir):
+        print(f"  note: several roots, so state goes in "
+              f"{Path(os.path.commonpath([str(f.resolve()) for f in args.folder]))}"
+              f"; pass --cache-dir/--data-dir to put it somewhere deliberate")
+
     app = None
     if args.reload:
         # The app is built in the subprocess, not here, so index only far
         # enough to report the count and to fail now rather than inside a
         # reloader that would retry the same bad folder forever. The child
         # scans again, but against the mtime cache this leaves warm.
-        library = Library(args.folder, recursive=args.recursive)
+        library = Library(args.folder, recursive=args.recursive, **dirs)
         library.scan()
     else:
-        app = create_app(args.folder, recursive=args.recursive)
+        app = create_app(args.folder, recursive=args.recursive, **dirs)
         library = app.state.library
     print(f"  {len(library.entries)} plasmids, {sum(1 for e in library.sorted_entries() if e.is_part)} usable parts")
 
@@ -322,6 +322,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
     if args.reload:
         os.environ[ENV_FOLDERS] = json.dumps([str(f.resolve()) for f in args.folder])
         os.environ[ENV_RECURSIVE] = "1" if args.recursive else "0"
+        for key, value in ((ENV_CACHE_DIR, args.cache_dir), (ENV_DATA_DIR, args.data_dir)):
+            os.environ[key] = str(value.resolve()) if value else ""
         print(f"  reloading on changes to {PACKAGE}/**/*.py")
         uvicorn.run(
             "ggassembler.api.main:from_env",

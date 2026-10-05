@@ -8,10 +8,11 @@ from __future__ import annotations
 import io
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
+from . import routes_sync
 from ..core.library import Library
 from ..core.parttypes import DESCRIPTIONS
 from ..levels import level1_part as level1
@@ -222,11 +223,12 @@ def export(request: Request, body: DesignRequest) -> PlainTextResponse:
 
 
 @router.post("/save")
-def save(request: Request, body: DesignRequest) -> dict[str, Any]:
+def save(request: Request, body: DesignRequest, tasks: BackgroundTasks) -> dict[str, Any]:
     """Write the predicted part plasmid into the library folder and re-index it."""
     library = get_library(request)
     result = level1.design(library, body.to_request())
     path = level1.save(library, result, body.name)
     if path is None:
         return {"ok": False, "issues": _payload(result)["issues"]}
+    routes_sync.after_save(request, tasks, f"add {body.name}")
     return {"ok": True, "path": path, "name": body.name, "validated_as": result.validated_as}

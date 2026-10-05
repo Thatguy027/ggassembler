@@ -25,6 +25,7 @@ from . import (
     routes_library,
     routes_plate,
     routes_sequencing,
+    routes_sync,
     routes_uniprot,
 )
 
@@ -36,6 +37,8 @@ PACKAGE = Path(__file__).resolve().parent.parent
 #: How ``ggasm serve --reload`` hands the library to the subprocess.
 ENV_FOLDERS = "GGASM_FOLDERS"
 ENV_RECURSIVE = "GGASM_RECURSIVE"
+ENV_CACHE_DIR = "GGASM_CACHE_DIR"
+ENV_DATA_DIR = "GGASM_DATA_DIR"
 
 #: Each screen: its URL, the folder under web/, and the tab it lights up.
 SCREENS = {
@@ -55,10 +58,13 @@ def create_app(
     recursive: bool = True,
     scheme: Scheme = YTK,
     scan: bool = True,
+    cache_dir: str | Path | None = None,
+    data_dir: str | Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="GG Assembler", version="0.1.0")
 
-    library = Library(roots, recursive=recursive, scheme=scheme)
+    library = Library(roots, recursive=recursive, scheme=scheme,
+                      cache_dir=cache_dir, data_dir=data_dir)
     if scan:
         library.scan()
     app.state.library = library
@@ -66,6 +72,7 @@ def create_app(
     app.include_router(routes_library.router)
     app.include_router(routes_uniprot.router)
     app.include_router(routes_sequencing.router)
+    app.include_router(routes_sync.router)
     app.include_router(routes_plate.router)
     app.include_router(routes_level2.router)
 
@@ -123,6 +130,8 @@ def from_env() -> FastAPI:
     return create_app(
         [Path(folder) for folder in json.loads(raw)],
         recursive=os.environ.get(ENV_RECURSIVE, "1") != "0",
+        cache_dir=os.environ.get(ENV_CACHE_DIR) or None,
+        data_dir=os.environ.get(ENV_DATA_DIR) or None,
     )
 
 
