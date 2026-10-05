@@ -255,3 +255,12 @@ panel badges cannot drift apart. The three typefaces are vendored in
 ## Licence
 
 MIT. Copyright (c) 2026 Stefan Zdraljevic. See [LICENSE](LICENSE).
+
+The bundled fonts are not covered by it. IBM Plex and Space Grotesk are
+redistributed under the SIL Open Font License 1.1, whose text travels with them
+in [`ggassembler/web/fonts/LICENSE-fonts.txt`](ggassembler/web/fonts/LICENSE-fonts.txt).
+
+No plasmid sequences are in this repository, now or in its history. The test
+fixtures are built from the part-type definitions rather than checked in, so
+the tests describe the standard rather than any particular lab's collection.
+A library is something you point the app at.
