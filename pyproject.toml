@@ -11,6 +11,20 @@ requires-python = ">=3.11"
 authors = [{ name = "Stefan Zdraljevic", email = "szdralje@g.ucla.edu" }]
 license = "MIT"
 license-files = ["LICENSE"]
+keywords = ["golden-gate", "moclo", "yeast-toolkit", "synthetic-biology",
+            "plasmid", "cloning", "opentrons"]
+classifiers = [
+    # No "License ::" classifier on purpose: PEP 639 replaced it with the
+    # license expression above, and PyPI rejects a distribution carrying both.
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Environment :: Web Environment",
+]
 dependencies = [
     "biopython>=1.83",
     "fastapi>=0.110",
@@ -21,8 +35,21 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 
+[project.urls]
+Homepage = "https://github.com/Thatguy027/ggassembler"
+Repository = "https://github.com/Thatguy027/ggassembler"
+Issues = "https://github.com/Thatguy027/ggassembler/issues"
+"Starter library" = "https://github.com/Thatguy027/ytk-starter-library"
+
 [project.scripts]
 ggasm = "ggassembler.cli:main"
+
+[tool.hatch.build.targets.sdist]
+# Named explicitly rather than excluded one by one. The default is "everything
+# git does not ignore", which swept in a folder of working notes that are not
+# ignored because they were never meant to be committed either - and a PyPI
+# release cannot be taken back once it is up.
+include = ["ggassembler", "tests", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.hatch.build.targets.wheel]
 # `packages` already carries everything under ggassembler/, web/ included.

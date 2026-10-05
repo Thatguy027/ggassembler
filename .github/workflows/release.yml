@@ -1,0 +1,69 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to publish"
+        required: true
+        default: testpypi
+        type: choice
+        options: [testpypi, pypi]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - run: uv build
+
+      - name: Nothing goes out that the tests have not passed
+        run: uv run --all-extras pytest -q
+
+      - name: Nothing goes out that is not what it says it is
+        run: uvx twine check dist/*
+
+      - name: Nothing goes out that carries working notes
+        # The sdist defaults to "everything git does not ignore", which once
+        # included a folder of prompts. A PyPI release cannot be withdrawn, so
+        # this is checked rather than remembered.
+        run: |
+          if tar tzf dist/*.tar.gz | grep -iE 'claude outputs|\.env|secret'; then
+            echo "::error::the sdist contains something that should not be published"
+            exit 1
+          fi
+          echo "sdist is clean"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Trusted publishing: PyPI verifies this workflow's OIDC identity, so there
+    # is no API token to store, leak or rotate. The environment also gives a
+    # place to require a manual approval before anything is uploaded.
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        if: inputs.target == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish to PyPI
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.target == 'pypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
