@@ -10,6 +10,35 @@ cassette assembly, multigene assembly, a library index, a protein search that
 writes a gene you can order, a plate that builds ninety-six cassettes at once,
 and a check of what came back from sequencing.
 
+## Get started
+
+Three commands, from nothing to a running app with 192 published plasmids in it:
+
+```sh
+uv tool install git+https://github.com/Thatguy027/ggassembler
+ggasm init ytk --starter
+ggasm serve ytk
+```
+
+Opens <http://127.0.0.1:8737>. That is the whole setup — everything below is
+detail you can read when you need it.
+
+| | |
+|---|---|
+| **Already have plasmids?** | `ggasm serve /path/to/your/genbank/folder` |
+| **Joining a lab?** | `ggasm init plasmids --from git@github.com:<org>/<library>.git` |
+| **Working on the app itself?** | `uv sync && uv run ggasm serve <folder> --reload` |
+| **Need Python?** | 3.11 or newer. [uv](https://docs.astral.sh/uv/) installs it for you. |
+
+Nothing is uploaded anywhere. The app runs on your machine, reads your files,
+and only talks to the network if you ask it to search UniProt or share a
+library with your lab.
+
+---
+
+<details>
+<summary>The longer version of the above</summary>
+
 ```sh
 uv sync
 uv run ggasm serve ../goldengateR/inst/extdata/plasmids
@@ -61,6 +90,8 @@ routes it started with. `--reload` restarts it when a `.py` file changes:
 ```sh
 uv run ggasm serve ../goldengateR/inst/extdata/plasmids --reload
 ```
+
+</details>
 
 ## Sharing a library with a lab
 
