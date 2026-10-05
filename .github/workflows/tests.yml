@@ -17,7 +17,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        # Pinned, not `latest`: that label migrates to Ubuntu 26 on
+        # 2026-10-19, and a test suite should change runner image when
+        # somebody decides to rather than on a date GitHub picked.
+        os: [ubuntu-24.04]
         python: ["3.11", "3.12", "3.13"]
         include:
           # One macOS run, because that is what the app is developed on and
@@ -27,7 +30,7 @@ jobs:
             python: "3.13"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Identify git for the sharing tests
         # tests/test_sync.py drives real repositories and makes real commits.
@@ -38,7 +41,7 @@ jobs:
           git config --global user.email "ci@example.invalid"
           git config --global user.name "CI"
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
 
@@ -48,10 +51,10 @@ jobs:
   wheel:
     # The build broke once by shipping web/ twice and nobody noticed, because
     # nothing ever built it. Building is the test for that.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
 
       - run: uv build
 

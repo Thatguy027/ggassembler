@@ -14,10 +14,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
 
       - name: The tag has to be the version being published
         # Nothing otherwise connects them: tagging v0.2.0 while pyproject still
@@ -53,14 +53,14 @@ jobs:
           fi
           echo "sdist is clean"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Trusted publishing: PyPI verifies this workflow's OIDC identity, so there
     # is no API token to store, leak or rotate. The environment also gives a
     # place to require a manual approval before anything is uploaded.
@@ -68,7 +68,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist/
