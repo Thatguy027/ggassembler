@@ -57,6 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--no-recursive", dest="recursive", action="store_false")
     serve.add_argument("--no-browser", dest="browser", action="store_false",
                        help="do not open a browser tab")
+    serve.add_argument("--reload", action="store_true",
+                       help="restart the server when a .py file in the package changes")
 
     return parser
 
@@ -272,12 +274,25 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
+    """Index the library and serve the app, optionally reloading on edits.
+
+    ``--reload`` only watches ``*.py``, which is uvicorn's default and also the
+    right answer here: the app serves ``web/`` with ``no-cache``, so a changed
+    stylesheet or script is already one browser refresh away. Restarting the
+    process for those would throw away the index and reload nothing new.
+
+    Python is the opposite case. The routers register at ``create_app`` time,
+    so a running server keeps serving the routes it started with no matter what
+    the files on disk say - which looks exactly like a change that did not
+    work.
+    """
+    import os
     import threading
     import webbrowser
 
     import uvicorn
 
-    from .api.main import create_app
+    from .api.main import ENV_FOLDERS, ENV_RECURSIVE, PACKAGE, create_app
 
     for folder in args.folder:
         if not folder.is_dir():
@@ -285,13 +300,38 @@ def cmd_serve(args: argparse.Namespace) -> int:
             return 2
 
     print(f"indexing {', '.join(str(f) for f in args.folder)} ...")
-    app = create_app(args.folder, recursive=args.recursive)
-    library = app.state.library
+
+    app = None
+    if args.reload:
+        # The app is built in the subprocess, not here, so index only far
+        # enough to report the count and to fail now rather than inside a
+        # reloader that would retry the same bad folder forever. The child
+        # scans again, but against the mtime cache this leaves warm.
+        library = Library(args.folder, recursive=args.recursive)
+        library.scan()
+    else:
+        app = create_app(args.folder, recursive=args.recursive)
+        library = app.state.library
     print(f"  {len(library.entries)} plasmids, {sum(1 for e in library.sorted_entries() if e.is_part)} usable parts")
 
     url = f"http://{args.host}:{args.port}/"
     if args.browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     print(f"\nGG Assembler on {url}  (ctrl-c to stop)")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+
+    if args.reload:
+        os.environ[ENV_FOLDERS] = json.dumps([str(f.resolve()) for f in args.folder])
+        os.environ[ENV_RECURSIVE] = "1" if args.recursive else "0"
+        print(f"  reloading on changes to {PACKAGE}/**/*.py")
+        uvicorn.run(
+            "ggassembler.api.main:from_env",
+            factory=True,
+            reload=True,
+            reload_dirs=[str(PACKAGE)],
+            host=args.host,
+            port=args.port,
+            log_level="warning",
+        )
+    else:
+        uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0

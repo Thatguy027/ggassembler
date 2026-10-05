@@ -7,6 +7,8 @@ import another one.
 
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 from typing import Sequence
 
@@ -27,6 +29,13 @@ from . import (
 )
 
 WEB = Path(__file__).resolve().parent.parent / "web"
+
+#: The package itself - what ``--reload`` watches.
+PACKAGE = Path(__file__).resolve().parent.parent
+
+#: How ``ggasm serve --reload`` hands the library to the subprocess.
+ENV_FOLDERS = "GGASM_FOLDERS"
+ENV_RECURSIVE = "GGASM_RECURSIVE"
 
 #: Each screen: its URL, the folder under web/, and the tab it lights up.
 SCREENS = {
@@ -90,6 +99,31 @@ def create_app(
         return {"ok": True, "plasmids": len(library.entries), "scheme": library.scheme.name}
 
     return app
+
+
+def from_env() -> FastAPI:
+    """Build the app from the environment, for ``ggasm serve --reload``.
+
+    Reload mode runs the app in a subprocess that uvicorn imports by name, so
+    there is no way to pass it the folders as arguments: nothing built in the
+    parent survives the respawn. The CLI puts them in the environment and this
+    reads them back.
+
+    JSON rather than a separator-joined string because a path may legally
+    contain whatever separator one picks, and a library folder with a colon in
+    its name should not quietly index half of itself.
+    """
+    raw = os.environ.get(ENV_FOLDERS)
+    if not raw:
+        raise RuntimeError(
+            f"{ENV_FOLDERS} is not set. This factory exists so that "
+            f"`ggasm serve --reload` can respawn the app; to build one "
+            f"yourself, call create_app() with the folders."
+        )
+    return create_app(
+        [Path(folder) for folder in json.loads(raw)],
+        recursive=os.environ.get(ENV_RECURSIVE, "1") != "0",
+    )
 
 
 def _screen(folder: str):

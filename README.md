@@ -20,6 +20,15 @@ Opens on <http://127.0.0.1:8737>. Several folders scan as one library:
 uv run ggasm serve ..          # every plasmid in the project
 ```
 
+Files under `web/` are served with `no-cache`, so an edited stylesheet or
+script needs nothing but a browser refresh. Python is not like that - the
+routers register when the app is built, so a running server keeps serving the
+routes it started with. `--reload` restarts it when a `.py` file changes:
+
+```sh
+uv run ggasm serve ../goldengateR/inst/extdata/plasmids --reload
+```
+
 ## The idea it rests on
 
 **What a plasmid is gets decided by the enzymes, never by its name or its

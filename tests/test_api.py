@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import re
 
 import pytest
 from fastapi.testclient import TestClient
 
-from ggassembler.api.main import create_app
+from ggassembler.api.main import ENV_FOLDERS, ENV_RECURSIVE, create_app, from_env
+from ggassembler.cli import build_parser
 from ggassembler.core.seqio import write_genbank
 
 from . import synth
@@ -1152,3 +1154,49 @@ def test_a_callout_does_not_print_its_component_twice(client):
     block = block[:block.index("callout-meta")]
     assert "part.label" not in block, "the callout name is still the component"
     assert "part.source_name" in block
+
+
+# --------------------------------------------------------------- reload ----
+
+
+def test_serve_does_not_reload_unless_asked():
+    """The default has to stay off: `--reload` costs a subprocess and throws
+    the index away on every edit, which is wrong for the ordinary run."""
+    args = build_parser().parse_args(["serve", "."])
+    assert args.reload is False
+    assert build_parser().parse_args(["serve", ".", "--reload"]).reload is True
+
+
+def test_from_env_builds_the_library_the_cli_handed_over(client, monkeypatch):
+    """Reload mode respawns the app in a subprocess, so the folders travel
+    through the environment. If they did not arrive, the reloaded app would
+    come back empty and look like the library had vanished."""
+    monkeypatch.setenv(ENV_FOLDERS, json.dumps([str(client.library_dir)]))
+    monkeypatch.setenv(ENV_RECURSIVE, "1")
+    with TestClient(from_env()) as reloaded:
+        assert reloaded.get("/health").json()["plasmids"] == 9
+
+
+def test_from_env_honours_no_recursive(client, monkeypatch, tmp_path):
+    """`--no-recursive` is part of what the subprocess needs to know: dropping
+    it would index folders the user deliberately excluded."""
+    nested = client.library_dir / "nested"
+    nested.mkdir()
+    write_genbank(synth.part_plasmid("3", name="pBuried"), nested / "pBuried.gb")
+
+    monkeypatch.setenv(ENV_FOLDERS, json.dumps([str(client.library_dir)]))
+    monkeypatch.setenv(ENV_RECURSIVE, "0")
+    with TestClient(from_env()) as shallow:
+        assert shallow.get("/health").json()["plasmids"] == 9
+
+    monkeypatch.setenv(ENV_RECURSIVE, "1")
+    with TestClient(from_env()) as deep:
+        assert deep.get("/health").json()["plasmids"] == 10
+
+
+def test_from_env_says_what_it_is_for_when_nothing_set_it(monkeypatch):
+    """Imported by hand it would otherwise fail somewhere inside Library with
+    a message about an empty path list."""
+    monkeypatch.delenv(ENV_FOLDERS, raising=False)
+    with pytest.raises(RuntimeError, match="ggasm serve --reload"):
+        from_env()
