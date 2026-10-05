@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,7 +8,9 @@ version = "0.1.0"
 description = "GG Assembler - design Golden Gate assemblies in the Yeast Toolkit (YTK) standard"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+authors = [{ name = "Stefan Zdraljevic", email = "szdralje@g.ucla.edu" }]
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "biopython>=1.83",
     "fastapi>=0.110",
@@ -23,10 +25,10 @@ dev = ["pytest>=8.0"]
 ggasm = "ggassembler.cli:main"
 
 [tool.hatch.build.targets.wheel]
+# `packages` already carries everything under ggassembler/, web/ included.
+# A force-include of web/ on top of it offered the same files twice and the
+# build refused: "a second file is being added at the same path".
 packages = ["ggassembler"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"ggassembler/web" = "ggassembler/web"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

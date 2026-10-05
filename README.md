@@ -230,3 +230,7 @@ radius comes from `web/tokens.css`, including the eight part-arc hues, which
 `core/parttypes.py` also serves to the API so the map, the callouts and the
 panel badges cannot drift apart. The three typefaces are vendored in
 `web/fonts/`, so every screen but Proteins works with no network at all.
+
+## Licence
+
+MIT. Copyright (c) 2026 Stefan Zdraljevic. See [LICENSE](LICENSE).
