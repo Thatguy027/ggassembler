@@ -20,12 +20,8 @@ ggasm init ytk --starter
 ggasm serve ytk
 ```
 
-The third command opens `http://127.0.0.1:8737` in your browser. That is the
-whole setup — everything below is detail you can read when you need it.
-
-That address is not a link to anywhere: `127.0.0.1` means *this machine*, so it
-only resolves once you are running the server yourself. There is nothing to
-visit until you do.
+The last command opens the app in your browser. That is the whole setup —
+everything below is detail you can read when you need it.
 
 | | |
 |---|---|
