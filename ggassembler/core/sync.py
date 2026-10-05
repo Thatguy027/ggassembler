@@ -296,6 +296,14 @@ DENIED = (
 )
 
 
+#: The two published kits, as a repository anyone can read without being in a
+#: lab. `ggasm init` falls back to it so that installing the app and having
+#: nothing to open is not the first thing that happens to a new user. HTTPS
+#: rather than SSH on purpose: this one needs no key, and asking someone to
+#: set up GitHub access before they have seen the app work is the wrong order.
+STARTER = "https://github.com/Thatguy027/ytk-starter-library.git"
+
+
 def clone(url: str, into: Path) -> Path:
     """Clone an organisation's library, or say why not in words.
 

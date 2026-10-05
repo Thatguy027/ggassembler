@@ -57,6 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
                       help="where the library lives, or should be cloned to")
     init.add_argument("--from", dest="url", default=None, metavar="URL",
                       help="clone your lab's library from this git remote")
+    init.add_argument("--starter", action="store_true",
+                      help="clone the published YTK and MYT kits instead")
 
     serve = sub.add_parser("serve", help="start the app and open it in a browser")
     serve.add_argument("folder", type=Path, nargs="+", help="library folder(s) to index")
@@ -282,6 +284,11 @@ def cmd_init(args: argparse.Namespace) -> int:
     from .core import baseline, sync
 
     folder = args.folder
+    if args.starter and args.url:
+        print("pass --from or --starter, not both", file=sys.stderr)
+        return 2
+    if args.starter:
+        args.url = sync.STARTER
     if args.url:
         try:
             folder = sync.clone(args.url, folder)
@@ -290,7 +297,10 @@ def cmd_init(args: argparse.Namespace) -> int:
             return 2
         print(f"cloned into {folder}")
     elif not folder.is_dir():
-        print(f"not a folder: {folder}\n\nTo clone your lab's library instead:\n"
+        print(f"not a folder: {folder}\n\n"
+              f"To start from the published YTK and MYT kits:\n"
+              f"  ggasm init {folder} --starter\n\n"
+              f"To clone your lab's library:\n"
               f"  ggasm init {folder} --from git@github.com:<org>/<library>.git",
               file=sys.stderr)
         return 2

@@ -338,3 +338,25 @@ def test_init_does_not_overwrite_an_agreed_baseline(lab):
 def test_init_on_a_folder_that_is_not_there_says_how_to_clone_one(tmp_path, capsys):
     assert run_init(str(tmp_path / "nothing-here")) == 2
     assert "--from" in capsys.readouterr().err
+
+
+def test_the_starter_library_is_a_public_https_url():
+    """A new user has no SSH key on their account yet, and asking them to set
+    GitHub access up before they have seen the app work is the wrong order."""
+    assert sync.STARTER.startswith("https://")
+    assert sync.STARTER.endswith(".git")
+
+
+def test_init_refuses_two_sources_at_once(capsys):
+    from ggassembler.cli import build_parser, cmd_init
+    args = build_parser().parse_args(["init", "x", "--starter", "--from", "u"])
+    assert cmd_init(args) == 2
+    assert "not both" in capsys.readouterr().err
+
+
+def test_init_offers_the_starter_when_there_is_nothing_to_open(tmp_path, capsys):
+    """The first thing that happens to someone who installed the app and has
+    no plasmids must not be a bare error."""
+    assert run_init(str(tmp_path / "nowhere")) == 2
+    said = capsys.readouterr().err
+    assert "--starter" in said and "--from" in said

@@ -15,11 +15,30 @@ uv sync
 uv run ggasm serve ../goldengateR/inst/extdata/plasmids
 ```
 
-Joining a lab that already has a library, with nothing on your machine yet:
+With nothing on your machine yet, start from the two published kits:
+
+```sh
+ggasm init ytk --starter
+ggasm serve ytk
+```
+
+That clones [ytk-starter-library](https://github.com/Thatguy027/ytk-starter-library)
+— pYTK001–096 and pMYT001–096, 121 usable parts covering every position of the
+part circle, no detection conflicts — which is enough to design and simulate a
+complete cassette without adding anything of your own.
+
+Joining a lab that already has its own library:
 
 ```sh
 ggasm init plasmids --from git@github.com:<org>/<library>.git
 ggasm serve plasmids
+```
+
+A public base library and a private one scan as a single library, so you can
+have both:
+
+```sh
+ggasm serve ~/ggasm/ytk ~/ggasm/mylab --cache-dir ~/.ggasm
 ```
 
 `init` clones it, tells the repository to ignore the index and merge the build
@@ -222,7 +241,7 @@ few bases off.
 ## Test
 
 ```sh
-uv run pytest        # 990 tests, on 3.11, 3.12 and 3.13 in CI
+uv run pytest        # 993 tests, on 3.11, 3.12 and 3.13 in CI
 ```
 
 Several exist because of a specific bug and say so. A few examples: an
