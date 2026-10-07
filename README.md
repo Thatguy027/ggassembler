@@ -15,7 +15,7 @@ and a check of what came back from sequencing.
 Three commands, from nothing to a running app with 192 published plasmids in it:
 
 ```sh
-uv tool install git+https://github.com/Thatguy027/ggassembler
+uv tool install ggassembler
 ggasm init ytk --starter
 ggasm serve ytk
 ```
@@ -29,6 +29,7 @@ everything below is detail you can read when you need it.
 | **Joining a lab?** | `ggasm init plasmids --from git@github.com:<org>/<library>.git` |
 | **Working on the app itself?** | `uv sync && uv run ggasm serve <folder> --reload` |
 | **Need Python?** | 3.11 or newer. [uv](https://docs.astral.sh/uv/) installs it for you. |
+| **No uv?** | `pipx install ggassembler`, or `pip install ggassembler` into a virtualenv. |
 
 Nothing is uploaded anywhere. The app runs on your machine, reads your files,
 and only talks to the network if you ask it to search UniProt or share a
