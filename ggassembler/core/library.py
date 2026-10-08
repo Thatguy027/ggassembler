@@ -38,7 +38,12 @@ from .parttypes import YTK, Scheme, color_for, span
 CACHE_DIR = ".ggasm"
 INDEX_FILE = "index.json"
 SETTINGS_FILE = "settings.json"
-INDEX_VERSION = 11
+#: Bumped whenever detection changes, not only when the cache *format* does.
+#: The cache is keyed on each file's mtime and size, so a new rule applied to
+#: unchanged files would otherwise never run: you would install the new code
+#: and keep reading the old answer, with nothing to show that anything was
+#: stale. 12 is the acceptor rule - destination vectors with no BsaI sites.
+INDEX_VERSION = 12
 
 #: Lab data: what people decided, not what the app worked out. Shared, so a
 #: colleague's curation arrives with their plasmids rather than being lost.

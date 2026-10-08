@@ -741,3 +741,27 @@ def test_a_cassette_that_keeps_its_backbone_stays_a_cassette(tmp_path):
     entry = lib.get("pBig")
     released = (entry.cassette_span[1] - entry.cassette_span[0]) % entry.length
     assert released / entry.length < 0.95, "fixture does not exercise the rule"
+
+
+def test_a_cached_index_does_not_outlive_a_change_to_detection(tmp_path):
+    """The cache is keyed on each file's mtime and size, so a rule change
+    applied to unchanged files never runs unless the version says so. The
+    acceptor rule shipped once without this, which would have meant installing
+    the new code and still reading the old classification."""
+    import json
+
+    from ggassembler.core.library import INDEX_VERSION
+
+    write_genbank(synth.part_plasmid("3", name="pOne"), tmp_path / "pOne.gb")
+    lib = Library(tmp_path)
+    lib.scan()
+    assert lib.index_path.exists()
+
+    stale = json.loads(lib.index_path.read_text())
+    stale["version"] = INDEX_VERSION - 1
+    lib.index_path.write_text(json.dumps(stale))
+
+    again = Library(tmp_path)
+    again.scan()
+    assert json.loads(again.index_path.read_text())["version"] == INDEX_VERSION, (
+        "an index written by an older detection rule was kept")
