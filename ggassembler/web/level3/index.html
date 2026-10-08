@@ -214,8 +214,14 @@
     <form method="dialog" class="sheet-head">
       <span class="sheet-title">Design a multigene construct</span>
       <span style="flex-grow: 1"></span>
+      <label class="btn" id="design-load-label" title="Reload a design from a -design.json">
+        Reload a design&hellip;
+        <input type="file" id="design-load" accept=".json,application/json" hidden>
+      </label>
       <button class="btn" type="button" id="design-add">Add unit</button>
       <button class="btn" type="button" id="design-run">Work it out</button>
+      <button class="btn" type="button" id="design-protocols" disabled>Protocols</button>
+      <button class="btn" type="button" id="design-save" disabled>Save all to library</button>
       <button class="btn btn-primary" type="button" id="design-write" disabled>Download all</button>
       <button class="btn" value="close">Close</button>
     </form>

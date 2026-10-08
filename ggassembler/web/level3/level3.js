@@ -1082,6 +1082,8 @@ function renderDesignReport(result) {
   pre.textContent = result.report;
   host.append(pre);
   el('design-write').disabled = !result.ok;
+  el('design-protocols').disabled = !result.ok;
+  el('design-save').disabled = !result.ok;
 }
 
 /* The cassette backbone: positions 6, 7 and 8, chosen once for the whole
@@ -1101,6 +1103,25 @@ const BACKBONE_SLOTS = [
  * element, because each one is replaced by a searchable control - a wrapper
  * round an input and a select - and a wrapper has no `value`. */
 const sharedChoice = {};
+
+/* The shared pickers get the same searchable control as the units. They are
+ * replaced rather than filled, because the markup ships a plain <select> so
+ * the dialog still reads sensibly before any script runs - and replaced again
+ * on a reload, since a custom control cannot be set by assigning `.value`. */
+function wireSharedPickers() {
+  for (const [slot] of BACKBONE_SLOTS) {
+    const picker = el(`design-shared-${slot}`);
+    if (!picker) continue;
+    const replacement = searchableSelect({
+      entries: designParts[slot] || [],
+      chosen: sharedChoice[slot] || '',
+      blank: 'Choose for me',
+      onPick: (name) => { sharedChoice[slot] = name; },
+    });
+    replacement.id = picker.id;
+    picker.replaceWith(replacement);
+  }
+}
 
 function sharedBackbone() {
   const out = {};
@@ -1128,23 +1149,7 @@ function wireDesign() {
           .filter((r) => r.part_type === slot)
           .sort((a, b) => (a.display || a.name).localeCompare(b.display || b.name));
       }
-      // The shared pickers get the same searchable control as the units.
-      // They are replaced rather than filled, because the markup ships a plain
-      // <select> so the dialog still reads sensibly before any script runs.
-      for (const [slot] of BACKBONE_SLOTS) {
-        const picker = el(`design-shared-${slot}`);
-        if (!picker || picker.dataset.wired) continue;
-        const chosen = picker.value;
-        const replacement = searchableSelect({
-          entries: designParts[slot] || [],
-          chosen,
-          blank: 'Choose for me',
-          onPick: (name) => { sharedChoice[slot] = name; },
-        });
-        replacement.dataset.wired = 'true';
-        replacement.id = picker.id;
-        picker.replaceWith(replacement);
-      }
+      wireSharedPickers();
     }
     const picker = el('design-backbone');
     if (picker.options.length <= 1) {
@@ -1160,6 +1165,8 @@ function wireDesign() {
     renderDesignUnits();
     el('design-report').replaceChildren();
     el('design-write').disabled = true;
+    el('design-protocols').disabled = true;
+    el('design-save').disabled = true;
     el('design-dialog').showModal();
   });
 
@@ -1175,6 +1182,80 @@ function wireDesign() {
       renderDesignReport(await post('/api/level3/design', designBody()));
     } finally {
       button.disabled = false;
+    }
+  });
+
+  /* Download the reactions: one BsaI per cassette, then the BsmBI that joins
+   * them. Separate from the plasmids because they are what you take to the
+   * bench, and you want them on separate days. */
+  el('design-protocols').addEventListener('click', async () => {
+    const response = await fetch('/api/level3/design/protocols.txt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(designBody()),
+    });
+    if (!response.ok) return;
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${designBody().name}-reactions.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+
+  /* Put the lot in the library. Until this existed the only way to keep a
+   * design was a zip to unpack by hand, which meant a cassette you had just
+   * designed could not be picked on any screen. */
+  el('design-save').addEventListener('click', async () => {
+    const button = el('design-save');
+    const was = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Saving\u2026';
+    try {
+      const body = await post('/api/level3/design/save', designBody());
+      if (body.ok) {
+        button.textContent = `Saved ${body.saved.length}`;
+        await refresh();
+        setTimeout(() => { button.textContent = was; button.disabled = false; }, 2500);
+        return;
+      }
+      window.alert('Not saved:\n\n' + (body.issues || []).join('\n'));
+    } catch (error) {
+      window.alert(`Not saved: ${error.message || error}`);
+    }
+    button.textContent = was;
+    button.disabled = false;
+  });
+
+  /* Reload a design from the -design.json the download carries. The build
+   * order is written for a human and does not round-trip: names are
+   * abbreviated in it, and a part chosen and then changed leaves no trace. */
+  el('design-load').addEventListener('change', async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const saved = JSON.parse(await file.text());
+      if (!Array.isArray(saved.units) || !saved.units.length) {
+        throw new Error('no transcription units in that file');
+      }
+      el('design-title').value = saved.name || 'pPathway';
+      designRows = saved.units.map((u) => ({ ...u, backbone: { ...(u.backbone || {}) } }));
+      for (const [slot] of BACKBONE_SLOTS) {
+        sharedChoice[slot] = (saved.shared || {})[slot] || '';
+      }
+      el('design-backbone').value = saved.backbone || '';
+      wireSharedPickers();
+      renderDesignUnits();
+      el('design-report').replaceChildren();
+      el('design-write').disabled = true;
+      el('design-protocols').disabled = true;
+      el('design-save').disabled = true;
+    } catch (error) {
+      window.alert(
+        `That is not a design file.\n\n${error.message || error}\n\n`
+        + 'Use the -design.json from a Download all, not the build order.');
+    } finally {
+      event.target.value = '';
     }
   });
 

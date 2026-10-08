@@ -516,6 +516,113 @@ def _integration_notes(
         )
 
 
+def design_protocols(library: Library, report: DesignReport) -> str:
+    """Every reaction a design needs, in the order they have to be run.
+
+    One BsaI reaction per cassette and one BsmBI reaction to join them. They
+    are separate reactions on separate days - the cassettes have to be built
+    and verified before the multigene step can use them - so they are written
+    out as separate protocols rather than one list of tubes.
+
+    Concentrations come from the library where they have been measured. Where
+    they have not, the reaction says so rather than inventing a volume: a
+    protocol that quietly assumes 50 ng/uL is a protocol that is wrong by
+    whatever the real prep was.
+    """
+    from ..core import protocol
+
+    def pieces(names: Sequence[str]) -> list[tuple]:
+        out = []
+        for name in names:
+            entry = library.get(name)
+            if entry is not None:
+                out.append((entry.display, entry.length, entry.conc_ng_ul, entry.path))
+        return out
+
+    blocks: list[str] = [
+        f"{report.name} - reactions",
+        "=" * (len(report.name) + 12),
+        "",
+        f"{len(report.cassettes)} BsaI reaction(s), then one BsmBI reaction.",
+        "Each cassette has to be built and checked before the multigene step.",
+        "",
+    ]
+
+    for index, plan in enumerate(report.cassettes, start=1):
+        rx = protocol.reaction(
+            name=plan.name,
+            enzyme=library.scheme.part_enzyme,
+            parts=pieces([plan.parts[k] for k in SLOT_ORDER if k in plan.parts]),
+        )
+        blocks.append(f"--- {index}. {plan.name} " + "-" * max(0, 56 - len(plan.name)))
+        blocks.append(protocol.as_text(rx))
+        blocks.append("")
+
+    if report.backbone:
+        rx = protocol.reaction(
+            name=report.name,
+            enzyme=library.scheme.multigene_enzyme,
+            parts=pieces([c.name for c in report.cassettes]),
+            destination=next(iter(pieces([report.backbone])), None),
+            reversed_dropout=True,
+        )
+        blocks.append(f"--- {len(report.cassettes) + 1}. {report.name} "
+                      + "-" * max(0, 56 - len(report.name)))
+        blocks.append(
+            "The cassettes below do not exist yet. Build and verify them first;\n"
+            "their concentrations are whatever your preps measure."
+        )
+        blocks.append("")
+        blocks.append(protocol.as_text(rx))
+
+    return "\n".join(blocks) + "\n"
+
+
+def save_design(library: Library, report: DesignReport) -> tuple[list[str], list[Issue]]:
+    """Write every plasmid a design calls for into the library, in build order.
+
+    The design hands back a stack of plasmids that do not exist yet, and until
+    now the only way to keep them was a zip of files to put somewhere by hand.
+    A cassette that is not in the library cannot be picked on any screen, so
+    the design and the thing you do next were separated by a file manager.
+
+    Written in build order, cassettes before the multigene, so that a library
+    scanned halfway through is still a library that makes sense: every plasmid
+    in it is one whose parts are already there.
+
+    Refuses to overwrite. A design re-run after an edit would otherwise
+    silently replace the plasmid somebody has already transformed, and there
+    is no way in the app to get the old one back.
+    """
+    from ..core import seqio
+
+    written: list[str] = []
+    issues: list[Issue] = []
+
+    plans: list[tuple[str, object]] = [(c.name, c.record) for c in report.cassettes]
+    if report.multigene is not None:
+        plans.append((report.name, report.multigene))
+
+    for name, record in plans:
+        if record is None:
+            issues.append(Issue(ERROR, "nothing_to_save", f"{name} was not built"))
+            continue
+        path = library.folder / f"{name}.gb"
+        if path.exists():
+            issues.append(Issue(
+                ERROR, "already_there",
+                f"{name}.gb is already in the library; rename the design or "
+                f"remove the old file first",
+            ))
+            continue
+        seqio.write_genbank(record, path)
+        written.append(name)
+
+    if written:
+        library.scan()
+    return written, issues
+
+
 def save(library: Library, result: MultigeneResult, name: str) -> str | None:
     """Write the assembled multigene plasmid into the library folder."""
     from ..core import seqio

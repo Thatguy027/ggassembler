@@ -1014,7 +1014,8 @@ def backboned(library, tmp_path):
     The base fixture has none: every earlier test let the design pick whatever
     it liked at those positions, which is exactly the behaviour being replaced.
     """
-    for part_type, names in (("6", ("mkHis", "mkLeu")), ("7", ("oriCen",)),
+    for part_type, names in (("2", ("pTest",)), ("3", ("cdsTest",)), ("4", ("tTest",)),
+                             ("6", ("mkHis", "mkLeu")), ("7", ("oriCen",)),
                              ("8", ("bbAmp",))):
         for name in names:
             write_genbank(synth.part_plasmid(part_type, name=name,
@@ -1161,3 +1162,102 @@ def test_the_search_does_not_go_back_to_the_server(client):
     block = script[script.index("function searchableSelect("):]
     block = block[:block.index("\nfunction ")]
     assert "fetch(" not in block and "/api/" not in block
+
+
+# ------------------------------------- keeping what a design worked out ---
+
+
+@pytest.fixture
+def full_client(backboned):
+    """A client over a library that can actually close a design.
+
+    The plain `client` fixture cannot: its library has type 1 connectors and no
+    type 5, so every design comes back with no cassettes and these tests would
+    all skip rather than check anything.
+    """
+    app = create_app(backboned.folder)
+    with TestClient(app) as client:
+        client.library_dir = backboned.folder
+        yield client
+
+
+def _body(**over):
+    unit = {"promoter": "pTest", "cds": "cdsTest", "terminator": "tTest"}
+    body = {"name": "pKeep",
+            "units": [{**unit, "name": "one"}, {**unit, "name": "two"}]}
+    body.update(over)
+    return body
+
+
+def test_a_design_can_be_put_straight_into_the_library(full_client):
+    """The design hands back plasmids that do not exist yet. Until this, the
+    only way to keep them was a zip to unpack by hand - so a cassette you had
+    just designed could not be picked on any screen."""
+    before = full_client.get("/health").json()["plasmids"]
+    body = full_client.post("/api/level3/design/save", json=_body()).json()
+    if not body["ok"] and any("backbone" in i for i in body["issues"]):
+        pytest.skip("this fixture cannot close a design")
+
+    assert body["saved"], body["issues"]
+    assert full_client.get("/health").json()["plasmids"] > before
+
+
+def test_saving_a_design_twice_refuses_rather_than_overwriting(full_client):
+    """A design re-run after an edit would otherwise replace the plasmid
+    somebody has already transformed, with no way to get the old one back."""
+    first = full_client.post("/api/level3/design/save", json=_body()).json()
+    if not first["saved"]:
+        pytest.skip("this fixture cannot close a design")
+
+    again = full_client.post("/api/level3/design/save", json=_body()).json()
+    assert again["ok"] is False
+    assert any("already in the library" in i for i in again["issues"])
+
+
+def test_the_reactions_cover_every_step(full_client):
+    """One BsaI per cassette and one BsmBI to join them - separate reactions on
+    separate days, because the cassettes have to be built and verified first."""
+    text = full_client.post("/api/level3/design/protocols.txt", json=_body()).text
+    assert "BsaI" in text
+    assert "BsmBI" in text or "cannot" in text.lower()
+
+
+def test_the_download_carries_the_design_itself(full_client):
+    """The build order is written for a human and does not round-trip: names
+    are abbreviated in it, and a part chosen and then changed leaves no
+    trace."""
+    import io
+    import json
+    import zipfile
+
+    response = full_client.post("/api/level3/design.zip", json=_body())
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    names = archive.namelist()
+    assert any(n.endswith("-design.json") for n in names), names
+    assert any(n.endswith("-reactions.txt") for n in names), names
+
+    saved = json.loads(archive.read("pKeep-design.json"))
+    assert [u["name"] for u in saved["units"]] == ["one", "two"]
+
+
+def test_a_reloaded_design_gives_the_same_answer(full_client):
+    """What is written out has to be what goes back in."""
+    import io
+    import json
+    import zipfile
+
+    first = full_client.post("/api/level3/design", json=_body()).json()
+    archive = zipfile.ZipFile(io.BytesIO(full_client.post("/api/level3/design.zip",
+                                                     json=_body()).content))
+    again = full_client.post("/api/level3/design",
+                        json=json.loads(archive.read("pKeep-design.json"))).json()
+
+    def shape(d):
+        return [(c["name"], tuple(sorted(c["parts"].items()))) for c in d["cassettes"]]
+    assert shape(first) == shape(again)
+
+
+def test_the_dialog_offers_all_three(client):
+    html = client.get("/multigene").text
+    for control in ("design-save", "design-protocols", "design-load"):
+        assert f'id="{control}"' in html, f"{control} is missing from the dialog"

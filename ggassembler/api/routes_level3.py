@@ -6,6 +6,7 @@ Touches `levels/level3_multigene` and `core` only.
 from __future__ import annotations
 
 import io
+import json
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Request, Response
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from ..core import protocol
 from . import routes_sync
+from ..core.assembly import ERROR
 from ..core.library import Library
 from ..levels import level3_multigene as level3
 
@@ -258,6 +260,15 @@ def design_zip(request: Request, body: DesignRequestBody) -> Response:
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(f"{report.name}-build-order.txt",
                          level3.design_report(report, library))
+        archive.writestr(f"{report.name}-reactions.txt",
+                         level3.design_protocols(library, report))
+        # What was asked for, rather than what came out: drop this back into
+        # the Design dialog weeks later and the units, the backbone and every
+        # per-unit choice come back exactly as they were. The build order is
+        # for a human and does not round-trip - names get abbreviated, and a
+        # part chosen and then changed leaves no trace in it.
+        archive.writestr(f"{report.name}-design.json",
+                         json.dumps(body.model_dump(), indent=2, sort_keys=True))
         for index, plan in enumerate(report.cassettes, start=1):
             if plan.record is None:
                 continue
@@ -276,6 +287,44 @@ def design_zip(request: Request, body: DesignRequestBody) -> Response:
         buffer.getvalue(),
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{report.name}-design.zip"'},
+    )
+
+
+@router.post("/design/save")
+def design_save(request: Request, body: DesignRequestBody,
+                tasks: BackgroundTasks) -> dict[str, Any]:
+    """Put every plasmid the design calls for into the library, in build order.
+
+    The design hands back a stack of plasmids that do not exist yet, and the
+    only way to keep them was a zip to unpack somewhere by hand - which meant a
+    cassette you had just designed could not be picked on any screen until you
+    had been to a file manager.
+    """
+    library = get_library(request)
+    report = _design(library, body)
+    if not report.ok:
+        return {"ok": False, "saved": [],
+                "issues": [i.message for i in report.issues if i.level == ERROR]}
+
+    written, issues = level3.save_design(library, report)
+    if written:
+        routes_sync.after_save(request, tasks, f"add {report.name} and its cassettes")
+    return {
+        "ok": not issues,
+        "saved": written,
+        "issues": [i.message for i in issues],
+    }
+
+
+@router.post("/design/protocols.txt", response_class=PlainTextResponse)
+def design_protocols(request: Request, body: DesignRequestBody) -> Response:
+    """One BsaI reaction per cassette, then the BsmBI reaction that joins them."""
+    library = get_library(request)
+    report = _design(library, body)
+    return PlainTextResponse(
+        level3.design_protocols(library, report),
+        headers={"Content-Disposition":
+                 f'attachment; filename="{report.name}-reactions.txt"'},
     )
 
 

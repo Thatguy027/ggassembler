@@ -445,6 +445,23 @@ CTGA"*. For the multi-round pMYT destinations that is usually a ConLS′ or
 ConRE′ connector, which the kit supplies only on one side, so a library built
 from parts alone will not have one until you add it.
 
+When it has worked something out, four things you can do with it:
+
+| | |
+|---|---|
+| **Save all to library** | writes every cassette and the multigene plasmid into your library, in build order, and shares them. They are pickable on every screen at once |
+| **Protocols** | one BsaI reaction per cassette, then the BsmBI reaction that joins them — separate, because the cassettes have to be built and checked first |
+| **Download all** | a zip: every plasmid as a `.gb`, the build order, the reactions, and the design itself |
+| **Reload a design…** | drop back the `-design.json` from a download and every unit, the backbone and each per-unit choice return as they were |
+
+Saving refuses to overwrite. A design re-run after an edit would otherwise
+replace a plasmid you have already transformed, and nothing in the app brings
+the old one back.
+
+Reload takes the `-design.json`, not the build order. The build order is
+written to be read — names are abbreviated in it, and a part you chose and then
+changed leaves no trace.
+
 **Protocol** gives the assembly steps for the BsmBI reaction.
 </details>
 
