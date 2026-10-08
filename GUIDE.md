@@ -18,25 +18,63 @@ version is not enough.
 
 ## 1. Install the app
 
+If your lab works in conda, use the environment file — it pins the Python
+version and brings `git`, which the app needs for sharing a library and which
+pip will not install for you:
+
+```sh
+conda env create -f https://raw.githubusercontent.com/Thatguy027/ggassembler/main/environment.yml
+conda activate ggassembler
+```
+
+Otherwise, one line:
+
 ```sh
 uv tool install ggassembler
 ```
 
-<details>
-<summary>No uv, or it is not on your PATH</summary>
+Check it worked:
 
-`uv` is the fastest route because it installs Python for you. Without it:
+```sh
+ggasm --help
+```
+
+<details>
+<summary>Which to pick, what the prerequisites actually are, and upgrading</summary>
+
+**Prerequisites** are only two, and the conda file supplies both:
+
+| | | |
+|---|---|---|
+| Python 3.11+ | required | `uv` and conda both install it for you |
+| `git` | for sharing only | already on macOS and most Linux; the app says so if it is missing, and everything else keeps working |
+
+**Which route.** conda if your lab already standardises on it, or if you want
+the environment pinned and reproducible. `uv` if you just want the app — it is
+one line and installs its own Python.
+
+If you have cloned the repository you can use the local file instead of the
+URL: `conda env create -f environment.yml`. `mamba env create -f
+environment.yml` is the same thing, faster.
+
+**Without either:**
 
 ```sh
 pipx install ggassembler          # or
 pip install ggassembler           # inside a virtualenv
 ```
 
-Needs Python 3.11 or newer. If `ggasm` is not found after installing, the tool
-directory is not on your PATH — `uv tool update-shell` fixes that for uv, then
-open a new terminal.
+**If you have both**, a `uv tool install` on your PATH will shadow the one in
+an activated conda environment — `which ggasm` says which you are running, and
+they are separate installs that upgrade separately.
 
-To upgrade later: `uv tool upgrade ggassembler`.
+**If `ggasm` is not found afterwards**, check it installed at all — `uv tool
+list` should name `ggassembler`, or `conda list ggassembler` inside the
+environment. zsh also caches which commands exist, so a shell that failed once
+keeps failing: run `rehash` or open a new terminal.
+
+**Upgrading:** `uv tool upgrade ggassembler`, or `pip install -U ggassembler`
+inside the conda environment.
 </details>
 
 ---

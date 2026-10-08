@@ -34,6 +34,7 @@ checking what came back from sequencing.
 | **Working on the app itself?** | `uv sync && uv run ggasm serve <folder> --reload` |
 | **Need Python?** | 3.11 or newer. [uv](https://docs.astral.sh/uv/) installs it for you. |
 | **No uv?** | `pipx install ggassembler`, or `pip install ggassembler` into a virtualenv. |
+| **Use conda?** | `conda env create -f environment.yml && conda activate ggassembler` |
 
 Nothing is uploaded anywhere. The app runs on your machine, reads your files,
 and only talks to the network if you ask it to search UniProt or share a

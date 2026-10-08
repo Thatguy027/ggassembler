@@ -1,0 +1,30 @@
+# A conda environment with everything GG Assembler needs.
+#
+#   conda env create -f environment.yml
+#   conda activate ggassembler
+#   ggasm init ytk --starter
+#   ggasm serve ytk
+#
+# Why a conda file when the app is on PyPI: it pins the Python version and
+# brings git, which the app shells out to for sharing a library, and which is
+# the one prerequisite not installed by pip.
+name: ggassembler
+
+channels:
+  - conda-forge
+
+dependencies:
+  # The app supports 3.11 through 3.13. Pinned here rather than ranged so that
+  # two people following this file get the same interpreter.
+  - python=3.12
+  - pip
+
+  # Not a Python dependency. `ggasm init` clones a library with it and the
+  # Library screen pushes and pulls with it, so without git those features
+  # report that the library cannot be shared. Everything else still works.
+  - git
+
+  - pip:
+      # Unpinned, so a fresh environment gets the current release. Pin it
+      # (ggassembler==0.1.0) if you need two environments to match exactly.
+      - ggassembler
