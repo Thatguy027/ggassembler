@@ -159,8 +159,6 @@ re-read only what changed.
 
 Open the **Library** tab. Sharing is on by default.
 
-![The Library screen, with the sharing bar at the top](docs/images/04-library-sync.png)
-
 Saving a plasmid on any screen publishes it to your lab. **Sync now** pulls in
 what colleagues have added.
 
@@ -190,8 +188,6 @@ per lab is what keeps one lab's plasmids out of another's.
 Copy the `.gb` or `.gbk` files into your library folder, then press **Re-scan**
 on the Library screen.
 
-![The Re-scan button, top right of the Library screen](docs/images/05-rescan.png)
-
 They are available immediately, and still there next time you start the app.
 
 <details>
@@ -219,15 +215,18 @@ copying needed.
 
 **Part plasmid** tab. Paste a sequence, pick what it should become, save.
 
-![The Part screen with the sequence box, part type and Save circled](docs/images/06-part.png)
+![The Part plasmid screen with a CDS pasted in; the sequence box, part type and Save to library are circled](docs/images/part_demo.png)
 
-1. Paste your sequence into the sequence box
-2. Choose a **part type** — 3 for a CDS, 2 for a promoter, 4 for a terminator
-3. Name it
+1. Paste your sequence into **PASTED SEQUENCE**
+2. **TARGET PART TYPE** — Type 3 for a CDS, 2 for a promoter, 4 for a terminator
+3. Give it a **PART NAME**
 4. **Save to library**
 
-It designs the primers that add the right BsaI ends, and shows them on the
-template with the predicted construct below.
+It designs the primers that add the right ends and shows them on the template,
+with the predicted plasmid, what goes into it and how it ligates on the right.
+The blue notes are it telling you what it did — above, that it kept a terminal
+TAA, dropped a leading ATG because the TATG overhang supplies one, and confirmed
+the result re-digests as `TATG → ATCC`.
 
 <details>
 <summary>Sequence conventions, and when to change them</summary>
@@ -248,8 +247,13 @@ that catch people out:
 terminator it is often unclear which change is safe, and that is your call, not
 the app's.
 
-Pick the **entry vector** to match the ends you want. **Export .gbk** gives you
-the file without adding it to the library.
+**DESTINATION PLASMID** picks what the part lands in; left on *Best for this
+part type (automatic)* it chooses for you. **Export .gbk** gives you the file
+without adding it to the library.
+
+**Insert** at the top switches between **PCR product**, **gBlock** and **Oligo
+duplex** — the primers it designs depend on which, and an oligo duplex gets
+annealed oligos instead.
 </details>
 
 ---
@@ -259,7 +263,7 @@ the file without adding it to the library.
 **Cassette** tab. It opens on a worked assembly from your own library, so you
 can see a complete design before changing anything.
 
-![The Cassette screen, with a part panel and the Save button circled](docs/images/07-cassette.png)
+![The Cassette screen showing a complete eight-part assembly; a part panel and Save are circled](docs/images/cassette.png)
 
 1. Click a panel and pick a part — each offers only parts whose overhangs fit
    that position
@@ -294,7 +298,7 @@ promoter in your library against a fixed CDS, say — and writes them all out.
 
 **Multigene** tab. Chain cassettes into one construct.
 
-![The Multigene screen with Add TU and the vector selector circled](docs/images/08-multigene.png)
+![The Multigene screen with four transcription units; the vector selector and Add TU are circled](docs/images/multi.png)
 
 1. **Add TU** for each transcription unit, and pick a cassette for each
 2. Choose a **multigene vector**
@@ -323,15 +327,18 @@ begin with the cassettes already in hand.
 **Sequencing** tab. Compare clones a vendor sent back against what they should
 have been.
 
-![The Sequencing screen with the reference picker, Add clone and Align circled](docs/images/09-sequencing.png)
+![The Sequencing screen after aligning three clones; the reference picker, the drop zone and Align are circled](docs/images/align_demo.png)
 
 1. Pick the reference — **A plasmid in the library**, **A construct you
    designed**, or **A file or paste**
-2. **Add clone** for each sequenced file
+2. Drop the vendor's files into **What came back** — the file name becomes the
+   clone's name
 3. **Align**
 
-Each clone gets a verdict — matches, or differs here — with a scrollable
-alignment below it.
+Each clone gets a verdict with a scrollable alignment below it. Above, one clone
+matches, one has a 12 bp deletion in CamR, and one has a single C→A in ColE1 and
+was read on the opposite strand — which the app worked out rather than reporting
+as a rearrangement.
 
 <details>
 <summary>Whole-plasmid reads, and reading the alignment</summary>
@@ -364,6 +371,7 @@ sequencing it later has something to check against.
 | `ggasm: command not found` | first check it is actually installed: `uv tool list` should name `ggassembler`. If it is there, zsh has cached the miss — run `rehash` or open a new terminal. Only if it is still missing is PATH the problem: `uv tool update-shell` |
 | `not a folder: ytk` | the library has not been created yet — `ggasm init ytk --starter` |
 | The page will not load | the terminal running `ggasm serve` has stopped; start it again |
+| `address already in use` | an older `ggasm serve` still holds the port — and the app in your browser is **that** one, serving whatever library it was started with. `pkill -f 'ggasm serve'`, then start again, or pass `--port` |
 | A plasmid is missing | **Re-scan** on the Library screen; if still missing, it is not a GenBank file the app could read |
 | A part is not offered | its overhangs do not fit that position — the Library screen says what it was detected as |
 | Sharing says it cannot reach GitHub | `ssh -T git@github.com` to check access, `gh auth login` to set it up |

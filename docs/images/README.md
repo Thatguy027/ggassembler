@@ -1,28 +1,36 @@
 # Screenshots for GUIDE.md
 
-Six images, referenced by exact filename from [`../../GUIDE.md`](../../GUIDE.md).
-Until they exist the guide still reads correctly — each one renders as its alt
-text, which says what it would have shown.
-
-Take them with the app running (`ggasm serve ytk`) at a window width of roughly
-1400px, in whichever theme you prefer. Circle the named control in red.
-
-| File | Screen | Capture | Circle |
+| File | Screen | Shows | Marked |
 |---|---|---|---|
-| `04-library-sync.png` | `/library` | the sharing bar across the top | the **Share my plasmids with the lab** switch and **Sync now** |
-| `05-rescan.png` | `/library` | the top bar, right-hand side | **Re-scan** |
-| `06-part.png` | `/part` | a filled-in design, not an empty form | the sequence box, the **part type** selector, **Save to library** |
-| `07-cassette.png` | `/` | the worked assembly it opens on, ring map visible | one part panel and **Save** |
-| `08-multigene.png` | `/multigene` | two or three TUs added | **Add TU** and the **Multigene vector** selector |
-| `09-sequencing.png` | `/sequencing` | after an alignment has run, a verdict visible | the reference picker, **Add clone**, **Align** |
+| `part_demo.png` | `/part` | the demo CDS designed as a Type 3 part | sequence box, part type, Save to library |
+| `cassette.png` | `/` | a complete eight-part assembly | one part panel, Save |
+| `multi.png` | `/multigene` | four transcription units | vector selector, Add TU |
+| `align_demo.png` | `/sequencing` | three clones aligned - clean, deletion, substitution | reference sources, drop zone, Align |
+| `protein.png` | `/proteins` | not referenced by the guide yet | - |
 
-Two things worth getting right, because they are what makes a screenshot useful
-rather than decorative:
+Still missing, for sections 4 and 5, which read fine without them:
 
-**Fill the screen in first.** An empty form photographs badly and teaches
-nothing. The Cassette screen opens on a real assembly from your own library
-already, so it is ready as-is.
+| | Screen | Would show |
+|---|---|---|
+| sharing | `/library` | the **Share my plasmids with the lab** switch and **Sync now** |
+| re-scan | `/library` | **Re-scan**, top right |
 
-**Nothing unpublished in frame.** These go in a public repository. The starter
-library is a safe thing to screenshot; your lab's collection is not, so run
-`ggasm serve ytk` against the starter library rather than the full one.
+## If you retake any of these
+
+Run the app against the starter library, not your own:
+
+```sh
+ggasm serve ~/ytk
+```
+
+Check the header afterwards. If it names any library but `ytk`, something else
+was already holding port 8737 and the browser was showing *that* server - which
+is how the first set came to be shot against a private library despite the
+right command being typed. `ggasm serve` now refuses to start in that case
+rather than printing an address it is not serving.
+
+Demo material for filling the screens is in `~/ggasm-demo/` - a synthetic CDS
+for the Part screen, and three clones of pYTK047 for Sequencing.
+
+The paths in the current set were painted out after the fact. Retaking against
+`~/ytk` avoids needing that.

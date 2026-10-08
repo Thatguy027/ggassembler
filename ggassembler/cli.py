@@ -327,6 +327,24 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _port_in_use(host: str, port: int) -> bool:
+    """Whether something already holds this port.
+
+    Checked by binding it rather than by connecting: a connection test says
+    only that something answers, while the question is whether *this* process
+    will be able to listen.
+    """
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind((host, port))
+        except OSError:
+            return True
+    return False
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     """Index the library and serve the app, optionally reloading on edits.
 
@@ -380,6 +398,24 @@ def cmd_serve(args: argparse.Namespace) -> int:
     print(f"  {len(library.entries)} plasmids, {sum(1 for e in library.sorted_entries() if e.is_part)} usable parts")
 
     url = f"http://{args.host}:{args.port}/"
+
+    # Claim the port before saying anything, and before opening a browser.
+    # Printing the banner first made a clash read as a working app: the
+    # terminal said "GG Assembler on http://127.0.0.1:8737/", uvicorn then
+    # failed to bind, and the browser opened on whatever was already there -
+    # someone else's library, served by a process started hours ago.
+    taken = _port_in_use(args.host, args.port)
+    if taken:
+        print(
+            f"\nsomething is already serving {args.host}:{args.port}, so this "
+            f"would not have started.\n\n"
+            f"  If it is an older GG Assembler, it is serving whatever library "
+            f"it was started with,\n  not {', '.join(str(f) for f in args.folder)}. "
+            f"Stop it with `pkill -f 'ggasm serve'`, or use --port.\n",
+            file=sys.stderr,
+        )
+        return 2
+
     if args.browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     print(f"\nGG Assembler on {url}  (ctrl-c to stop)")

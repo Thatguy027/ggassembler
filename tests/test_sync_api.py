@@ -146,3 +146,44 @@ def test_the_guide_no_longer_points_at_the_old_storage(client):
     html = client.get("/library").text
     assert ".ggasm/overrides.json" not in html
     assert "ggasm/overrides/" in html
+
+
+# ------------------------------------------------------------ the port ------
+
+
+def test_a_busy_port_is_noticed_before_anything_is_claimed(tmp_path):
+    """An older server holding the port made `serve` print its success banner,
+    fail to bind, and open a browser on somebody else's library - which is how
+    a session's worth of screenshots came to show the wrong plasmids."""
+    import socket
+    from ggassembler.cli import _port_in_use
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as held:
+        held.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        held.bind(("127.0.0.1", 0))
+        held.listen(1)
+        port = held.getsockname()[1]
+        assert _port_in_use("127.0.0.1", port) is True
+
+    assert _port_in_use("127.0.0.1", port) is False
+
+
+def test_serve_stops_rather_than_pretending_it_started(tmp_path, capsys):
+    """It must not print the address of a server that is not this one."""
+    import socket
+    from ggassembler.cli import build_parser, cmd_serve
+
+    (tmp_path / "empty").mkdir()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as held:
+        held.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        held.bind(("127.0.0.1", 0))
+        held.listen(1)
+        port = held.getsockname()[1]
+
+        args = build_parser().parse_args(
+            ["serve", str(tmp_path / "empty"), "--port", str(port), "--no-browser"])
+        assert cmd_serve(args) == 2
+
+    out = capsys.readouterr()
+    assert "already serving" in out.err
+    assert "GG Assembler on" not in out.out, "it announced a server it did not start"
