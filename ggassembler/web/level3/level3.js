@@ -962,6 +962,37 @@ function designRow(row, index) {
     cell.append(text, select);
     grid.append(cell);
   }
+
+  /* The backbone, per unit. Blank means "whatever the design is using", which
+   * is the common case: a project usually varies the marker alone, because
+   * each unit integrates at a different locus, and keeps one origin and one
+   * E. coli backbone throughout. */
+  row.backbone = row.backbone || {};
+  for (const [slot, caption] of BACKBONE_SLOTS) {
+    const cell = document.createElement('label');
+    cell.className = 'design-cell';
+    const text = document.createElement('span');
+    text.className = 'lbl';
+    text.textContent = caption;
+    const select = document.createElement('select');
+    const same = document.createElement('option');
+    same.value = '';
+    same.textContent = 'same as the rest';
+    select.append(same);
+    for (const part of designParts[slot] || []) {
+      const option = document.createElement('option');
+      option.value = part.name;
+      option.textContent = part.display || part.name;
+      select.append(option);
+    }
+    select.value = row.backbone[slot] || '';
+    select.addEventListener('change', () => {
+      if (select.value) row.backbone[slot] = select.value;
+      else delete row.backbone[slot];
+    });
+    cell.append(text, select);
+    grid.append(cell);
+  }
   wrap.append(grid);
   return wrap;
 }
@@ -992,11 +1023,34 @@ function renderDesignReport(result) {
   el('design-write').disabled = !result.ok;
 }
 
+/* The cassette backbone: positions 6, 7 and 8, chosen once for the whole
+ * design and overridable on any one unit.
+ *
+ * Not positions 1 and 5. Those are the connectors, and they are what makes the
+ * units chain in the order the rows are in - offering them here would mean
+ * setting the order twice, in two places, with nothing keeping the two
+ * answers the same. */
+const BACKBONE_SLOTS = [
+  ['6', 'Marker'],
+  ['7', 'Yeast origin / homology'],
+  ['8', 'E. coli backbone'],
+];
+
+function sharedBackbone() {
+  const out = {};
+  for (const [slot] of BACKBONE_SLOTS) {
+    const picked = el(`design-shared-${slot}`);
+    if (picked && picked.value) out[slot] = picked.value;
+  }
+  return out;
+}
+
 function designBody() {
   return {
     name: el('design-title').value.trim() || 'pPathway',
     units: designRows,
     backbone: el('design-backbone').value || null,
+    shared: sharedBackbone(),
   };
 }
 
@@ -1004,10 +1058,21 @@ function wireDesign() {
   el('design-btn').addEventListener('click', async () => {
     if (!Object.keys(designParts).length) {
       const rows = await (await fetch('/api/library/plasmids')).json();
-      for (const slot of ['2', '3', '4']) {
+      for (const slot of ['2', '3', '4', '6', '7', '8']) {
         designParts[slot] = rows
           .filter((r) => r.part_type === slot)
           .sort((a, b) => (a.display || a.name).localeCompare(b.display || b.name));
+      }
+      // the shared pickers, filled once from the same list the units use
+      for (const [slot] of BACKBONE_SLOTS) {
+        const picker = el(`design-shared-${slot}`);
+        if (!picker || picker.options.length > 1) continue;
+        for (const part of designParts[slot] || []) {
+          const option = document.createElement('option');
+          option.value = part.name;
+          option.textContent = part.display || part.name;
+          picker.append(option);
+        }
       }
     }
     const picker = el('design-backbone');

@@ -755,6 +755,20 @@ class UnitSpec:
     terminator_b: str = ""
     """A second half, when position 4 is split 4a + 4b."""
     name: str = ""
+    backbone: dict[str, str] = field(default_factory=dict)
+    """Positions 6, 7 and 8 for this unit alone, where it differs from the rest.
+
+    A marker is the usual reason: a project integrates each unit at a different
+    locus, so each cassette carries a different selection even though the yeast
+    origin and the E. coli backbone never change. Empty means "whatever the
+    design chose", which is the shared default and then the simplest usable
+    part.
+
+    Positions 1 and 5 are deliberately not here. They are the connectors, and
+    they are what makes the units chain in the order asked for - choosing them
+    per unit would mean choosing the order twice, in two places, with nothing
+    keeping the two answers the same.
+    """
 
     def slots(self) -> dict[str, str]:
         """The positions this unit fills, and with what."""
@@ -916,14 +930,27 @@ def connector_plan(
     if not left or not right:
         return [], [Issue(ERROR, "no_backbone_ends",
                           f"{backbone.name} has no connector ends to design against")]
+    # Name the connector as well as the overhang. "nothing ends a unit at CTGA"
+    # is true and unactionable; "you would need a type 5 ConLS" says which
+    # plasmid to go and find, which for the multi-round destination vectors is
+    # the whole answer - their connectors exist in the kit only on the other
+    # side, so a library assembled from parts alone never has them.
+    named = index if index is not None else connector_names(library)
+
+    def label(overhang: str) -> str:
+        names = (named.get(overhang) or {}).get("names") or []
+        return f"{overhang} ({names[0]})" if names else overhang
+
     if right not in starts:
         issues.append(Issue(ERROR, "no_first_connector",
-                            f"nothing in the library begins a unit at {right}, where "
-                            f"{backbone.name} expects the chain to start"))
+                            f"nothing in the library begins a unit at {label(right)}, "
+                            f"where {backbone.name} expects the chain to start: you "
+                            f"would need a type 1 part releasing {right}"))
     if left not in ends:
         issues.append(Issue(ERROR, "no_last_connector",
-                            f"nothing in the library ends a unit at {left}, where "
-                            f"{backbone.name} expects the chain to close"))
+                            f"nothing in the library ends a unit at {label(left)}, "
+                            f"where {backbone.name} expects the chain to close: you "
+                            f"would need a type 5 part releasing {left}"))
     if issues:
         return [], issues
 
@@ -969,6 +996,12 @@ def _released(record, enzyme, name: str, component: str = "") -> Piece | None:
         part_type=None,
         component=component,
     )
+
+
+#: What "the backbone" means for a cassette: the marker, the yeast origin or
+#: homology arm, and the E. coli backbone. Positions 1 and 5 are connectors and
+#: belong to the chain, not to the backbone.
+BACKBONE = ("6", "7", "8")
 
 
 def _default_part(library: Library, part_type: str) -> PlasmidEntry | None:
@@ -1071,7 +1104,7 @@ def design(
         return report
 
     fixed = dict(shared or {})
-    for position in ("6", "7", "8"):
+    for position in BACKBONE:
         if not fixed.get(position):
             found = _default_part(library, position)
             if found is None:
@@ -1092,7 +1125,23 @@ def design(
             left_label=connector_label(left_overhang, "L", naming, first_end, last_end),
             right_label=connector_label(right_overhang, "R", naming, first_end, last_end),
         )
-        plan.parts = {"1": con_left.name, **spec.slots(), "5": con_right.name, **fixed}
+        own = {k: v for k, v in (spec.backbone or {}).items() if k in BACKBONE and v}
+        for position, plasmid in own.items():
+            entry = library.get(plasmid)
+            if entry is None:
+                plan.issues.append(Issue(
+                    ERROR, "no_part", f"no plasmid named {plasmid}"))
+            elif str(entry.call.part_type) != position:
+                # caught here rather than left to the assembly, which would
+                # report an overhang mismatch and leave you to work out that
+                # the marker slot was given an origin
+                plan.issues.append(Issue(
+                    ERROR, "wrong_type",
+                    f"{plasmid} is a type {entry.call.part_type} part, but "
+                    f"{plan.name} wants a type {position} at that position"))
+        plan.parts = {
+            "1": con_left.name, **spec.slots(), "5": con_right.name, **fixed, **own,
+        }
 
         pieces: list[Piece] = []
         for slot in SLOT_ORDER:

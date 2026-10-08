@@ -1002,3 +1002,124 @@ def _css_property(block, name):
         if text.startswith(f"{name}:"):
             return text.split(":", 1)[1].strip().rstrip(";").strip()
     return None
+
+
+# ------------------------------------------- a backbone per cassette ---
+
+
+@pytest.fixture
+def backboned(library, tmp_path):
+    """The library plus real type 6, 7 and 8 parts to choose between.
+
+    The base fixture has none: every earlier test let the design pick whatever
+    it liked at those positions, which is exactly the behaviour being replaced.
+    """
+    for part_type, names in (("6", ("mkHis", "mkLeu")), ("7", ("oriCen",)),
+                             ("8", ("bbAmp",))):
+        for name in names:
+            write_genbank(synth.part_plasmid(part_type, name=name,
+                                             seed=synth.seed_for(name)),
+                          tmp_path / f"{name}.gb")
+    # The base fixture cannot close a chain at all - it has type 1 connectors
+    # and no type 5 - so a design against it returns no cassettes and there is
+    # nothing to assert a backbone on. Both ends of pDest, in both directions.
+    # Both ends of pDest and two junctions in between, each in both
+    # directions: a chain of n units needs n-1 overhangs that a unit can both
+    # end at and the next begin at, which is a much smaller set than the
+    # connector list and the usual reason a good backbone will not close.
+    for part_type, overhang in (("1", "CCAA"), ("5", "CCAA"),
+                                ("1", "GATG"), ("5", "GATG"),
+                                ("1", "GTTC"), ("5", "GTTC"),
+                                ("1", "AGCA"), ("5", "AGCA")):
+        name = f"Con{part_type}_{overhang}"
+        write_genbank(synth.connector_plasmid(part_type, overhang, name=name),
+                      tmp_path / f"{name}.gb")
+    library.scan(force=True)
+    return library
+
+
+def test_each_cassette_can_carry_its_own_marker(backboned):
+    """A project integrates each unit at a different locus, so each cassette
+    needs its own selection while the origin and the E. coli backbone never
+    change."""
+    units = [level3.UnitSpec(name="one", backbone={"6": "mkHis"}),
+             level3.UnitSpec(name="two", backbone={"6": "mkLeu"})]
+    report = level3.design(backboned, units, name="pPer")
+
+    assert report.cassettes[0].parts["6"] == "mkHis"
+    assert report.cassettes[1].parts["6"] == "mkLeu"
+
+
+def test_a_unit_without_an_override_takes_the_shared_default(backboned):
+    units = [level3.UnitSpec(name="one", backbone={"6": "mkLeu"}),
+             level3.UnitSpec(name="two")]
+    report = level3.design(backboned, units, shared={"6": "mkHis"}, name="pMix")
+
+    assert report.cassettes[0].parts["6"] == "mkLeu", "the override lost"
+    assert report.cassettes[1].parts["6"] == "mkHis", "the shared default lost"
+
+
+def test_the_connectors_are_not_overridable_per_unit(backboned):
+    """Positions 1 and 5 are what make the units chain in the order asked for.
+    Choosing them per unit would mean choosing the order twice, in two places,
+    with nothing keeping the answers the same."""
+    units = [level3.UnitSpec(name="one", backbone={"1": "nonsense", "5": "nonsense"}),
+             level3.UnitSpec(name="two")]
+    report = level3.design(backboned, units, name="pChain")
+
+    assert report.cassettes[0].parts["1"] != "nonsense"
+    assert report.cassettes[0].parts["5"] != "nonsense"
+
+
+def test_a_marker_slot_given_an_origin_says_so(backboned):
+    """Left to the assembly it comes back as an overhang mismatch, and you are
+    left to work out that the marker slot was handed a type 7."""
+    units = [level3.UnitSpec(name="one", backbone={"6": "oriCen"})]
+    report = level3.design(backboned, units, name="pWrong")
+
+    codes = [i.code for c in report.cassettes for i in c.issues]
+    assert "wrong_type" in codes
+
+
+def test_an_override_naming_nothing_is_reported(backboned):
+    units = [level3.UnitSpec(name="one", backbone={"6": "pNotHere"})]
+    report = level3.design(backboned, units, name="pGone")
+
+    codes = [i.code for c in report.cassettes for i in c.issues]
+    assert "no_part" in codes
+
+
+def test_a_backbone_nothing_can_close_names_the_missing_connector(library):
+    """"nothing ends a unit at CTGA" is true and unactionable. Which part to go
+    and find is the whole answer, and for the multi-round destination vectors
+    it is the only answer - the kit has those connectors on one side only."""
+    stuck = [v for v in library.multigene_vectors()
+             if v.cassette_overhangs and level3.connector_plan(library, v, 1)[1]]
+    if not stuck:
+        pytest.skip("this library can close every backbone")
+
+    report = level3.design(library, [level3.UnitSpec(name="a")],
+                           backbone=stuck[0].name, name="pX")
+    said = " ".join(i.message for i in report.issues if i.level == 'error')
+    assert "type 1 part releasing" in said or "type 5 part releasing" in said
+
+
+def test_the_design_dialog_offers_a_backbone_and_a_per_unit_override(client):
+    """The positions were chosen silently before: "the simplest usable part at
+    each position", with no way to say otherwise from the screen."""
+    html = client.get("/multigene").text
+    for slot in ("6", "7", "8"):
+        assert f'id="design-shared-{slot}"' in html, f"no shared picker for position {slot}"
+
+    script = client.get("/static/level3/level3.js").text
+    assert "BACKBONE_SLOTS" in script
+    assert "row.backbone[slot]" in script, "a unit cannot override the shared choice"
+    assert "shared: sharedBackbone()" in script, "the shared choice is never sent"
+
+
+def test_the_dialog_does_not_offer_the_connectors(client):
+    """Positions 1 and 5 decide the order. Offering them beside the backbone
+    would mean setting the order twice, in two places."""
+    html = client.get("/multigene").text
+    assert 'id="design-shared-1"' not in html
+    assert 'id="design-shared-5"' not in html

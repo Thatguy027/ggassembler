@@ -410,12 +410,30 @@ you added them.
 <details>
 <summary>Designing from the other end, when you do not have the cassettes yet</summary>
 
-**Design…** works backwards: say what you want expressed and it works out which
-cassettes you would need, which of them you already have, and what is missing.
-**Work it out** runs it; **Download all** writes the lot.
+**Design…** works backwards, which is the direction a project actually starts
+from: say what you want expressed, in order, and it tells you the eight-part
+plasmids to build first.
 
-This is the more useful direction when starting a new construct — you rarely
-begin with the cassettes already in hand.
+Give it a promoter, a coding sequence and a terminator per unit, pick a
+destination backbone, and press **Work it out**. **Download all** writes them.
+
+**It assigns the connectors for you**, so the cassettes chain in the order of
+the rows — three units come out `ConLS → ConR1`, `ConL1 → ConR2`,
+`ConL2 → ConRE`. They come from the backbone's own ends, so a different
+destination gives a different chain. Positions 1 and 5 are not offered: they
+*are* the order, and setting them separately would mean saying it twice.
+
+**The cassette backbone — marker, yeast origin, E. coli backbone — is yours to
+choose**, once for the whole design, with an override on any unit. A marker
+usually differs per unit, since each one integrates at a different locus;
+origin and backbone rarely do. Left on *Choose for me* it takes the simplest
+usable part, which is what it always did.
+
+If a backbone cannot work it says which part is missing — *"nothing in the
+library ends a unit at CTGA (ConLS) … you would need a type 5 part releasing
+CTGA"*. For the multi-round pMYT destinations that is usually a ConLS′ or
+ConRE′ connector, which the kit supplies only on one side, so a library built
+from parts alone will not have one until you add it.
 
 **Protocol** gives the assembly steps for the BsmBI reaction.
 </details>

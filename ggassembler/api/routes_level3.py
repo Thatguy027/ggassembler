@@ -171,11 +171,16 @@ class UnitRequest(BaseModel):
     cds_b: str = ""
     terminator_b: str = ""
     name: str = ""
+    backbone: dict[str, str] = Field(default_factory=dict)
+    """Positions 6, 7 and 8 for this unit alone. Anything else is ignored:
+    the connectors belong to the chain, not to one unit."""
 
     def to_spec(self) -> level3.UnitSpec:
         return level3.UnitSpec(
             promoter=self.promoter, cds=self.cds, terminator=self.terminator,
             cds_b=self.cds_b, terminator_b=self.terminator_b, name=self.name,
+            backbone={k: v for k, v in self.backbone.items()
+                      if k in level3.BACKBONE and v},
         )
 
 
