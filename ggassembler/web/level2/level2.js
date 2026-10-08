@@ -1556,6 +1556,18 @@ function wireSaved() {
   });
 
   el('save-btn').addEventListener('click', async () => {
+    /* Ask for the name rather than taking whatever is in the field.
+     *
+     * The field starts at `pCassette` and keeps it until someone notices, so
+     * the first construct anyone saves is called pCassette and the second one
+     * they save properly leaves two copies of the same sequence - with no way
+     * in the app to remove either. A prompt at the moment of saving is the
+     * point where the name is actually being decided. */
+    const name = prompt('Save to library as:', state.name || 'cassette');
+    if (!name || !name.trim()) return;
+    state.name = name.trim();
+    el('construct-name').value = state.name;
+
     const button = el('save-btn');
     button.disabled = true;
     const was = button.textContent;

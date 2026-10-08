@@ -511,3 +511,20 @@ def test_saving_a_design_and_saving_a_plasmid_are_different_controls():
     html = (WEB / "level2" / "index.html").read_text(encoding="utf-8")
     assert 'id="save-design-btn"' in html and 'id="save-btn"' in html
     assert "Save to library" in html, "nothing says where a construct goes"
+
+
+def test_saving_to_the_library_asks_for_a_name():
+    """The name field holds a default - pCassette, new_part - until somebody
+    changes it, and nothing in the app removes a plasmid saved under the wrong
+    one. The first construct saved on this project was called pCassette, and
+    the fix was three git commands in a terminal.
+    """
+    offences = []
+    for level in LEVEL_DIRS:
+        source = _without_comments(
+            (WEB / level / f"{level}.js").read_text(encoding="utf-8"))
+        block = source[source.index("el('save-btn').addEventListener"):]
+        block = block[:1200]
+        if "prompt(" not in block:
+            offences.append(f"web/{level}/ saves without asking for a name")
+    assert not offences, "\n".join(offences)

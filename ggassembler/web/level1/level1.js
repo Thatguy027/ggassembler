@@ -693,6 +693,14 @@ el('export-btn').addEventListener('click', async () => {
 });
 
 el('save-btn').addEventListener('click', async () => {
+  // The name field keeps its default until someone changes it, so the save
+  // asks for one: this is the moment the name is being decided, and there is
+  // no way in the app to remove a plasmid saved under the wrong one.
+  const chosen = prompt('Save to library as:', state.name || 'new_part');
+  if (!chosen || !chosen.trim()) return;
+  state.name = chosen.trim();
+  el('name').value = state.name;
+
   const button = el('save-btn');
   button.disabled = true;
   const result = await post('/api/level1/save', state);

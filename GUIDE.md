@@ -256,6 +256,9 @@ downloads the file and changes nothing.
 Use **Export** for something you want to open in SnapGene or send to a vendor.
 Use **Save** for something you are actually going to build.
 
+**Save to library** asks what to call it before writing anything, so the name
+is decided once, deliberately, and is the filename on disk.
+
 > **Export is the orange button and Save is not**, which makes Export look like
 > the main action. If you meant to add a construct to your library and it is not
 > there, this is why. Exporting leaves no `.gb` in the library — it downloads
@@ -472,6 +475,6 @@ sequencing it later has something to check against.
 | A plasmid is missing | **Re-scan** on the Library screen; if still missing, it is not a GenBank file the app could read |
 | A part is not offered | its overhangs do not fit that position — the Library screen says what it was detected as |
 | I built something but cannot find it | you probably pressed **Export .gbk** (orange) rather than **Save**. Export downloads a file and adds nothing to the library. Reopen the design from **Saved designs…** and press Save |
-| It saved under the wrong name | the filename comes from **Construct name**, which starts as `pCassette`. Change it before saving |
+| It saved under the wrong name | the save asks for one, so answer it rather than accepting the default. To remove a mistake there is no control in the app: delete the `.gb` from the library folder, press **Re-scan**, and if it was shared, `git rm`/`commit`/`push` from that folder too |
 | Sharing says it cannot reach GitHub | `ssh -T git@github.com` to check access, `gh auth login` to set it up |
 | Changes to the app's code do nothing | restart `ggasm serve`, or run it with `--reload` |
