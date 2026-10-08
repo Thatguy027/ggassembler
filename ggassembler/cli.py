@@ -316,6 +316,11 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"  taught the repository to ignore the index and merge the build log"
               if changed else "  the repository already knows how to share this")
 
+    if args.starter:
+        sync.mark_reference(library)
+        print("  marked as a reference library: sharing off, so your own "
+              "constructs are never pushed into the published kits")
+
     if baseline.read(library) is None:
         state = baseline.write(library)
         print(f"  recorded a baseline: {len(state['conflicts'])} conflicts, "

@@ -360,3 +360,45 @@ def test_init_offers_the_starter_when_there_is_nothing_to_open(tmp_path, capsys)
     assert run_init(str(tmp_path / "nowhere")) == 2
     said = capsys.readouterr().err
     assert "--starter" in said and "--from" in said
+
+
+# ------------------------------------------------- the published kits ---
+
+
+def test_the_starter_library_is_never_published_into(lab):
+    """Its remote is a public repository every lab clones. Default-on sharing
+    plus one save made while pointed at it would push a lab's own construct
+    into the reference everyone else reads."""
+    sync.mark_reference(lab)
+    assert sync.is_reference(lab) is True
+    assert sync.enabled(lab) is False
+
+    write_genbank(synth.part_plasmid("3", name="pMine"), lab.roots[0] / "pMine.gb")
+    lab.scan()
+    with pytest.raises(sync.SyncError, match="reference library"):
+        sync.share(lab, "add pMine")
+
+
+def test_a_reference_library_still_receives(lab):
+    """Read-only means you do not publish into it, not that it goes stale."""
+    sync.mark_reference(lab)
+    sync.pull(lab)          # must not raise
+
+
+def test_an_ordinary_library_is_not_a_reference(lab):
+    assert sync.is_reference(lab) is False
+    assert sync.enabled(lab) is True
+
+
+def test_init_starter_marks_what_it_clones(lab, monkeypatch, tmp_path):
+    """The flag has to be set by `init`, not left to the person to remember."""
+    from ggassembler.cli import build_parser, cmd_init
+    monkeypatch.setattr(sync, "STARTER", str(sync.repo_of(lab)))
+
+    dest = tmp_path / "starter"
+    assert cmd_init(build_parser().parse_args(["init", str(dest), "--starter"])) == 0
+    # init marks the folder it was given, which is the clone's root.
+    cloned = Library(dest)
+    cloned.scan()
+    assert sync.is_reference(cloned) is True
+    assert sync.enabled(cloned) is False

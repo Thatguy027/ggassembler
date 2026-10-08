@@ -137,8 +137,30 @@ def repo_of(library: Library) -> Path | None:
 SETTING = "share_plasmids"
 
 
+#: Marks a library you read from rather than contribute to. Set when `ggasm
+#: init --starter` clones the published kits, which everyone shares and nobody
+#: should be publishing their own constructs into.
+REFERENCE = "reference_library"
+
+
 def enabled(library: Library) -> bool:
     return bool(library.settings().get(SETTING, True))
+
+
+def is_reference(library: Library) -> bool:
+    return bool(library.settings().get(REFERENCE, False))
+
+
+def mark_reference(library: Library) -> None:
+    """Make a library read-only as far as publishing is concerned.
+
+    A starter library's remote is a public repository that everyone clones.
+    Default-on sharing plus a save made while pointed at it would push one
+    lab's construct into the reference every other lab reads - and the save
+    that did it would look exactly like every other save.
+    """
+    library.set_setting(REFERENCE, True)
+    library.set_setting(SETTING, False)
 
 
 def set_enabled(library: Library, on: bool) -> bool:
@@ -268,6 +290,12 @@ def share(library: Library, message: str, force: bool = False) -> tuple[Status, 
     from . import baseline  # local: baseline reads a Library, as this does
 
     found = status(library)
+    if is_reference(library):
+        raise SyncError(
+            f"{library.folder} is a reference library - the published kits that "
+            f"everyone clones - so your own constructs do not belong in it. "
+            f"Point the app at your lab's library and save there instead."
+        )
     if not found.available:
         raise SyncError(found.detail or "sharing is not set up")
 

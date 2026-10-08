@@ -270,8 +270,17 @@ can see a complete design before changing anything.
 2. Name the construct
 3. **Save**
 
+It writes `<name>.gb` into your library folder, re-indexes it immediately, and
+— if sharing is on — publishes it to your lab. It is a plasmid like any other
+from that moment: available in every dropdown, and still there next launch.
+
 The ring map redraws as you go. If the assembly cannot close, it says which
 junction is the problem rather than just failing.
+
+> **Saves land in the first folder you served.** `ggasm serve ~/lab` saves into
+> `~/lab`. With several folders, the first one wins. Starter libraries cloned
+> with `--starter` refuse to be published into at all — they are the kits
+> everyone shares, not somewhere your constructs belong.
 
 <details>
 <summary>Splitting positions, composite parts, and the other two directions</summary>
