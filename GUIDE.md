@@ -323,7 +323,8 @@ sequencing it later has something to check against.
 
 | | |
 |---|---|
-| `ggasm: command not found` | the tool directory is not on your PATH — `uv tool update-shell`, then a new terminal |
+| `ggasm: command not found` | first check it is actually installed: `uv tool list` should name `ggassembler`. If it is there, zsh has cached the miss — run `rehash` or open a new terminal. Only if it is still missing is PATH the problem: `uv tool update-shell` |
+| `not a folder: ytk` | the library has not been created yet — `ggasm init ytk --starter` |
 | The page will not load | the terminal running `ggasm serve` has stopped; start it again |
 | A plasmid is missing | **Re-scan** on the Library screen; if still missing, it is not a GenBank file the app could read |
 | A part is not offered | its overhangs do not fit that position — the Library screen says what it was detected as |
