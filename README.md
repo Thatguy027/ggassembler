@@ -278,7 +278,7 @@ few bases off.
 ## Test
 
 ```sh
-uv run pytest        # 993 tests, on 3.11, 3.12 and 3.13 in CI
+uv run pytest        # 1002 tests, on 3.11, 3.12 and 3.13 in CI
 ```
 
 Several exist because of a specific bug and say so. A few examples: an
