@@ -23,6 +23,10 @@ ggasm serve ytk
 The last command opens the app in your browser. That is the whole setup —
 everything below is detail you can read when you need it.
 
+**[Read the guide](GUIDE.md)** for how to actually use it: getting a library,
+adding plasmids, building a part, a cassette and a multigene construct, and
+checking what came back from sequencing.
+
 | | |
 |---|---|
 | **Already have plasmids?** | `ggasm serve /path/to/your/genbank/folder` |
