@@ -1123,3 +1123,41 @@ def test_the_dialog_does_not_offer_the_connectors(client):
     html = client.get("/multigene").text
     assert 'id="design-shared-1"' not in html
     assert 'id="design-shared-5"' not in html
+
+
+def test_every_picker_in_the_design_dialog_can_be_searched(client):
+    """A plain dropdown over a few hundred parts is a scroll, and the thing you
+    want is rarely near the name you would guess."""
+    script = client.get("/static/level3/level3.js").text
+    assert "function searchableSelect(" in script
+    # used for the transcription unit positions and the backbone, not just one
+    assert script.count("searchableSelect({") >= 3, "only some pickers are searchable"
+
+
+def test_the_search_matches_what_is_inside_a_part(client):
+    """Parts are named for where they came from and remembered for what is in
+    them: pYTK009 is a TDH3 promoter and says so nowhere in its name."""
+    script = client.get("/static/level3/level3.js").text
+    block = script[script.index("function haystackOf("):]
+    block = block[:block.index("}")]
+    for field in ("entry.name", "entry.component", "entry.aliases"):
+        assert field in block, f"the search ignores {field}"
+
+
+def test_filtering_cannot_silently_unpick_a_part(client):
+    """Type a filter that excludes what you already chose and a plain rebuild
+    of the list drops it, taking the selection with it."""
+    script = client.get("/static/level3/level3.js").text
+    block = script[script.index("function searchableSelect("):]
+    block = block[:block.index("\nfunction ")]
+    assert "entry.name !== current" in block, (
+        "the chosen entry is not kept in the list when it stops matching")
+
+
+def test_the_search_does_not_go_back_to_the_server(client):
+    """The whole list for a position is already loaded; a round trip per
+    keystroke would be slower and could reorder the list under the cursor."""
+    script = client.get("/static/level3/level3.js").text
+    block = script[script.index("function searchableSelect("):]
+    block = block[:block.index("\nfunction ")]
+    assert "fetch(" not in block and "/api/" not in block

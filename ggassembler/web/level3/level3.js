@@ -905,6 +905,73 @@ wireProtocol();
 let designRows = [];
 let designed = null;
 
+/* A dropdown you can search, for the design dialog.
+ *
+ * A plain <select> over a few hundred parts is a scroll, and the thing you
+ * want is rarely near the name you would guess: parts are named for where they
+ * came from, and what you remember is what is in them. So the box matches the
+ * name, the component the digest found inside, and any alias - the same three
+ * the Cassette screen's picker matches on.
+ *
+ * Filtering happens here rather than over /api/library/search because the
+ * whole list for a position is already loaded, and a round trip per keystroke
+ * would be slower and could reorder the list under the cursor.
+ */
+function haystackOf(entry) {
+  return [entry.name, entry.display, entry.component, ...(entry.aliases || [])]
+    .filter(Boolean).join(' ').toLowerCase();
+}
+
+function searchableSelect({ entries, chosen, blank, onPick }) {
+  const wrap = document.createElement('div');
+  wrap.className = 'design-pick';
+
+  const find = document.createElement('input');
+  find.type = 'search';
+  find.className = 'design-find';
+  find.placeholder = 'search\u2026';
+  find.setAttribute('aria-label', 'Search parts');
+
+  const select = document.createElement('select');
+  let current = chosen || '';
+
+  function fill() {
+    const terms = find.value.toLowerCase().split(/\s+/).filter(Boolean);
+    select.replaceChildren();
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = blank;
+    select.append(none);
+
+    let shown = 0;
+    for (const entry of entries) {
+      const matches = !terms.length
+        || terms.every((t) => haystackOf(entry).includes(t));
+      // Whatever is currently chosen stays in the list even when it does not
+      // match, so typing a filter never silently unpicks it.
+      if (!matches && entry.name !== current) continue;
+      const option = document.createElement('option');
+      option.value = entry.name;
+      option.textContent = entry.display || entry.name;
+      select.append(option);
+      if (matches) shown += 1;
+    }
+    select.value = current;
+    find.dataset.found = terms.length ? String(shown) : '';
+    wrap.dataset.empty = terms.length && !shown ? 'true' : 'false';
+  }
+
+  find.addEventListener('input', fill);
+  select.addEventListener('change', () => {
+    current = select.value;
+    onPick(current);
+  });
+
+  fill();
+  wrap.append(find, select);
+  return wrap;
+}
+
 function partOptions(select, entries, chosen) {
   const blank = document.createElement('option');
   blank.value = '';
@@ -956,10 +1023,12 @@ function designRow(row, index) {
     const text = document.createElement('span');
     text.className = 'lbl';
     text.textContent = caption;
-    const select = document.createElement('select');
-    partOptions(select, designParts[slot] || [], row[field]);
-    select.addEventListener('change', () => { row[field] = select.value; });
-    cell.append(text, select);
+    cell.append(text, searchableSelect({
+      entries: designParts[slot] || [],
+      chosen: row[field],
+      blank: '\u2014',
+      onPick: (name) => { row[field] = name; },
+    }));
     grid.append(cell);
   }
 
@@ -974,23 +1043,15 @@ function designRow(row, index) {
     const text = document.createElement('span');
     text.className = 'lbl';
     text.textContent = caption;
-    const select = document.createElement('select');
-    const same = document.createElement('option');
-    same.value = '';
-    same.textContent = 'same as the rest';
-    select.append(same);
-    for (const part of designParts[slot] || []) {
-      const option = document.createElement('option');
-      option.value = part.name;
-      option.textContent = part.display || part.name;
-      select.append(option);
-    }
-    select.value = row.backbone[slot] || '';
-    select.addEventListener('change', () => {
-      if (select.value) row.backbone[slot] = select.value;
-      else delete row.backbone[slot];
-    });
-    cell.append(text, select);
+    cell.append(text, searchableSelect({
+      entries: designParts[slot] || [],
+      chosen: row.backbone[slot] || '',
+      blank: 'same as the rest',
+      onPick: (name) => {
+        if (name) row.backbone[slot] = name;
+        else delete row.backbone[slot];
+      },
+    }));
     grid.append(cell);
   }
   wrap.append(grid);
@@ -1036,11 +1097,15 @@ const BACKBONE_SLOTS = [
   ['8', 'E. coli backbone'],
 ];
 
+/* What the shared pickers are set to. Kept here rather than read back off the
+ * element, because each one is replaced by a searchable control - a wrapper
+ * round an input and a select - and a wrapper has no `value`. */
+const sharedChoice = {};
+
 function sharedBackbone() {
   const out = {};
   for (const [slot] of BACKBONE_SLOTS) {
-    const picked = el(`design-shared-${slot}`);
-    if (picked && picked.value) out[slot] = picked.value;
+    if (sharedChoice[slot]) out[slot] = sharedChoice[slot];
   }
   return out;
 }
@@ -1063,16 +1128,22 @@ function wireDesign() {
           .filter((r) => r.part_type === slot)
           .sort((a, b) => (a.display || a.name).localeCompare(b.display || b.name));
       }
-      // the shared pickers, filled once from the same list the units use
+      // The shared pickers get the same searchable control as the units.
+      // They are replaced rather than filled, because the markup ships a plain
+      // <select> so the dialog still reads sensibly before any script runs.
       for (const [slot] of BACKBONE_SLOTS) {
         const picker = el(`design-shared-${slot}`);
-        if (!picker || picker.options.length > 1) continue;
-        for (const part of designParts[slot] || []) {
-          const option = document.createElement('option');
-          option.value = part.name;
-          option.textContent = part.display || part.name;
-          picker.append(option);
-        }
+        if (!picker || picker.dataset.wired) continue;
+        const chosen = picker.value;
+        const replacement = searchableSelect({
+          entries: designParts[slot] || [],
+          chosen,
+          blank: 'Choose for me',
+          onPick: (name) => { sharedChoice[slot] = name; },
+        });
+        replacement.dataset.wired = 'true';
+        replacement.id = picker.id;
+        picker.replaceWith(replacement);
       }
     }
     const picker = el('design-backbone');

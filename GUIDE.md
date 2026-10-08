@@ -417,6 +417,10 @@ plasmids to build first.
 Give it a promoter, a coding sequence and a terminator per unit, pick a
 destination backbone, and press **Work it out**. **Download all** writes them.
 
+Every dropdown has a search box above it. It matches the part's name, the
+component the digest found inside it, and any alias — so `tdh` finds `pYTK009`,
+which is a TDH3 promoter and says so nowhere in its name.
+
 **It assigns the connectors for you**, so the cassettes chain in the order of
 the rows — three units come out `ConLS → ConR1`, `ConL1 → ConR2`,
 `ConL2 → ConRE`. They come from the backbone's own ends, so a different

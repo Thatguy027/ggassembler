@@ -251,3 +251,52 @@
   color: var(--ink-2);
 }
 @media (max-width: 640px) { .design-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ------------------------------------------------- searchable pickers ---
+ *
+ * A plain <select> over a few hundred parts is a scroll. The box above each
+ * one filters it on the name, the component the digest found inside, and any
+ * alias - because what you remember about a part is usually what is in it,
+ * not the name it was filed under.
+ */
+
+.design-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.design-pick > select {
+  min-width: 0;
+}
+
+.design-find {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) / 2);
+  background: var(--surface-sunk);
+  color: var(--ink-1);
+  min-width: 0;
+}
+
+.design-find::placeholder { color: var(--ink-3); }
+
+.design-find:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Say so when a search matches nothing, rather than showing a list that is
+ * empty but for whatever was already chosen. */
+.design-pick[data-empty="true"] .design-find {
+  border-color: var(--warn);
+}
+
+.design-pick[data-empty="true"]::after {
+  content: "nothing matches";
+  font-size: 0.72rem;
+  color: var(--warn);
+}
