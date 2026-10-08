@@ -9,10 +9,11 @@ version is not enough.
 3. [Start the app](#3-start-the-app)
 4. [Share your lab's library](#4-share-your-labs-library)
 5. [Add new plasmids](#5-add-new-plasmids)
-6. [Build a part plasmid](#6-build-a-part-plasmid)
-7. [Build an eight-part cassette](#7-build-an-eight-part-cassette)
-8. [Build a multi-TU plasmid](#8-build-a-multi-tu-plasmid)
-9. [Check a sequencing result](#9-check-a-sequencing-result)
+6. [Save and export what you build](#6-save-and-export-what-you-build)
+7. [Build a part plasmid](#7-build-a-part-plasmid)
+8. [Build an eight-part cassette](#8-build-an-eight-part-cassette)
+9. [Build a multi-TU plasmid](#9-build-a-multi-tu-plasmid)
+10. [Check a sequencing result](#10-check-a-sequencing-result)
 
 ---
 
@@ -128,8 +129,32 @@ ggasm serve ytk
 It opens in your browser. Leave the terminal running — closing it stops the app.
 Press `Ctrl-C` there when you are finished.
 
+Which folder you serve decides everything downstream — what you can pick from,
+and where anything you save ends up:
+
+```sh
+ggasm serve ~/lab      # your lab's library: everything, and saves go here
+ggasm serve ~/ytk      # the published kits only: read-only, nothing saves here
+```
+
 <details>
-<summary>Several libraries at once, a different port, and other options</summary>
+<summary>Running more than one, several libraries at once, ports and options</summary>
+
+**Two instances at the same time** need different ports, because the second one
+would otherwise find 8737 taken:
+
+```sh
+ggasm serve ~/lab                 # http://127.0.0.1:8737
+ggasm serve ~/ytk --port 8738     # http://127.0.0.1:8738
+```
+
+Each is a separate app on its own library. Keep the terminals apart, because
+the window tells you nothing about which is which beyond the library named in
+its header.
+
+If a start fails with `address already in use`, an older server still holds the
+port — **and the page in your browser is that one**, serving whatever library it
+was started with. `pkill -f 'ggasm serve'` ends it.
 
 A public base library and your lab's own scan as a single library:
 
@@ -211,7 +236,75 @@ copying needed.
 
 ---
 
-## 6. Build a part plasmid
+## 6. Save and export what you build
+
+Every screen that builds something offers the same two buttons, and they do
+different things.
+
+**Save** writes the construct into your library and keeps it. **Export .gbk**
+downloads the file and changes nothing.
+
+| | Save | Export .gbk |
+|---|---|---|
+| writes a `.gb` into your library folder | yes | no |
+| appears in dropdowns immediately | yes | no |
+| still there next launch | yes | no |
+| pushed to your lab | yes, if sharing is on | no |
+| you get a file in Downloads | no | yes |
+| checkable against a sequencing result later | yes, as a library plasmid | yes, as *a construct you designed* |
+
+Use **Export** for something you want to open in SnapGene or send to a vendor.
+Use **Save** for something you are actually going to build.
+
+> **Export is the orange button and Save is not**, which makes Export look like
+> the main action. If you meant to add a construct to your library and it is not
+> there, this is why. Exporting leaves no `.gb` in the library — it downloads
+> one and records the predicted sequence under `ggasm/expected/`.
+
+> **Saves land in the first folder you served.** `ggasm serve ~/lab` saves into
+> `~/lab`. Serve several folders and the first one wins — so put the library
+> you work in first.
+
+<details>
+<summary>Where the file goes, what it is named, and undoing a save</summary>
+
+The file is `<construct name>.gb` in the first library folder, so the name you
+type in the app is the name on disk. Saving twice with the same name overwrites.
+
+It is a plasmid like any other from that moment: it gets digested, typed and
+listed alongside everything else, and a cassette you saved can be used as a
+part of a multigene construct straight away.
+
+Either way you can check a clone against it weeks later, but by different
+routes. A **saved** construct is in the library, so the Sequencing screen finds
+it under **A plasmid in the library**. An **exported** one is not, so the app
+keeps its predicted sequence under `ggasm/expected/` and offers it under **A
+construct you designed**.
+
+Three other things are recorded as you work, all under `ggasm/` and all shared
+with your lab:
+
+| | |
+|---|---|
+| `ggasm/designs/` | the choices behind a design, so **Saved designs…** can reopen it |
+| `ggasm/expected/` | the predicted sequence of anything exported |
+| `ggasm/builds.jsonl` | one line per build: what was made, from what, how long |
+
+A design is not a plasmid. Saving a design keeps the eight choices; it does not
+put a construct in your library.
+
+**To undo one**, delete the `.gb` from the library folder and press **Re-scan**.
+If it was already shared, it is in your lab's git history too, so remove it
+there as well: `git rm <name>.gb && git commit && git push` from the library
+folder.
+
+**Starter libraries refuse to be saved into.** A library cloned with
+`--starter` is the published kit everyone shares, so publishing into it is
+blocked outright rather than quietly pushing your construct to a public
+repository.
+</details>
+
+## 7. Build a part plasmid
 
 **Part plasmid** tab. Paste a sequence, pick what it should become, save.
 
@@ -258,7 +351,7 @@ annealed oligos instead.
 
 ---
 
-## 7. Build an eight-part cassette
+## 8. Build an eight-part cassette
 
 **Cassette** tab. It opens on a worked assembly from your own library, so you
 can see a complete design before changing anything.
@@ -270,17 +363,12 @@ can see a complete design before changing anything.
 2. Name the construct
 3. **Save**
 
-It writes `<name>.gb` into your library folder, re-indexes it immediately, and
-— if sharing is on — publishes it to your lab. It is a plasmid like any other
-from that moment: available in every dropdown, and still there next launch.
+It writes `<name>.gb` into your library folder and publishes it to your lab —
+see [Save and export](#6-save-and-export-what-you-build).
 
 The ring map redraws as you go. If the assembly cannot close, it says which
 junction is the problem rather than just failing.
 
-> **Saves land in the first folder you served.** `ggasm serve ~/lab` saves into
-> `~/lab`. With several folders, the first one wins. Starter libraries cloned
-> with `--starter` refuse to be published into at all — they are the kits
-> everyone shares, not somewhere your constructs belong.
 
 <details>
 <summary>Splitting positions, composite parts, and the other two directions</summary>
@@ -303,7 +391,7 @@ promoter in your library against a fixed CDS, say — and writes them all out.
 
 ---
 
-## 8. Build a multi-TU plasmid
+## 9. Build a multi-TU plasmid
 
 **Multigene** tab. Chain cassettes into one construct.
 
@@ -331,7 +419,7 @@ begin with the cassettes already in hand.
 
 ---
 
-## 9. Check a sequencing result
+## 10. Check a sequencing result
 
 **Sequencing** tab. Compare clones a vendor sent back against what they should
 have been.
@@ -383,5 +471,7 @@ sequencing it later has something to check against.
 | `address already in use` | an older `ggasm serve` still holds the port — and the app in your browser is **that** one, serving whatever library it was started with. `pkill -f 'ggasm serve'`, then start again, or pass `--port` |
 | A plasmid is missing | **Re-scan** on the Library screen; if still missing, it is not a GenBank file the app could read |
 | A part is not offered | its overhangs do not fit that position — the Library screen says what it was detected as |
+| I built something but cannot find it | you probably pressed **Export .gbk** (orange) rather than **Save**. Export downloads a file and adds nothing to the library. Reopen the design from **Saved designs…** and press Save |
+| It saved under the wrong name | the filename comes from **Construct name**, which starts as `pCassette`. Change it before saving |
 | Sharing says it cannot reach GitHub | `ssh -T git@github.com` to check access, `gh auth login` to set it up |
 | Changes to the app's code do nothing | restart `ggasm serve`, or run it with `--reload` |
