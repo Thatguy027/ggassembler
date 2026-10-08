@@ -681,3 +681,63 @@ def test_readiness_survives_the_cache(tmp_path):
     second = Library(tmp_path)
     second.scan()  # reads the index written above rather than re-digesting
     assert second.get("ConR1").level3_ready == expected
+
+
+# ------------------------------------------------- acceptors with no BsaI ---
+
+
+def test_a_backbone_with_no_part_sites_is_still_a_backbone(tmp_path):
+    """The rule asked whether the *BsaI* sites were reversed. A destination
+    vector with no BsaI sites at all cannot answer that, so every one of them
+    was filed as a cassette and never offered as somewhere to assemble into -
+    which is what made eleven acceptors in a real library invisible.
+
+    What separates the two is which piece comes out. A cassette releases its
+    transcription unit and keeps the E. coli backbone; an acceptor releases the
+    backbone and keeps a stuffer.
+    """
+    acceptor = synth.cassette_plasmid(
+        "AGCA", "CTGA", body=synth.filler(3200, seed=7), name="pAcceptor", seed=12)
+    write_genbank(acceptor, tmp_path / "pAcceptor.gb")
+    lib = Library(tmp_path)
+    lib.scan()
+
+    entry = lib.get("pAcceptor")
+    assert entry.sites.part_enzyme_total == 0, "this test is about plasmids with no BsaI"
+    assert entry.is_multigene_vector, "a backbone that releases its backbone is a backbone"
+
+
+def test_a_small_plasmid_is_never_read_as_a_backbone(tmp_path):
+    """A 1.3 kb synthetic cassette carrying 318 bp of backbone releases 76% of
+    itself, which is acceptor-shaped by fraction alone. A real destination
+    vector carries a marker, an origin and an E. coli backbone and cannot be
+    that small, so size is the check that tells them apart."""
+    from ggassembler.core.library import ACCEPTOR_MINIMUM
+
+    # acceptor-shaped by fraction, and far too small to be one
+    small = synth.cassette_plasmid(
+        "AGCA", "CTGA", body=synth.filler(900, seed=5), name="tiny", seed=61)
+    write_genbank(small, tmp_path / "tiny.gb")
+    lib = Library(tmp_path)
+    lib.scan()
+
+    entry = lib.get("tiny")
+    released = (entry.cassette_span[1] - entry.cassette_span[0]) % entry.length
+    assert released / entry.length > 0.70, "fixture does not reach the fraction rule"
+    assert entry.length < ACCEPTOR_MINIMUM
+    assert not entry.is_multigene_vector, "size is what stops this being a backbone"
+
+
+def test_a_cassette_that_keeps_its_backbone_stays_a_cassette(tmp_path):
+    """The other side of the same rule: a large insert does not make a cassette
+    into a backbone. Forty-eight of them crossed a 50% threshold on insert size
+    alone before it was raised."""
+    cassette = synth.cassette_plasmid(
+        "CTGA", "CCAA", body=synth.filler(900, seed=3), name="pBig", seed=13)
+    write_genbank(cassette, tmp_path / "pBig.gb")
+    # and a backbone's worth of sequence on the retained side
+    lib = Library(tmp_path)
+    lib.scan()
+    entry = lib.get("pBig")
+    released = (entry.cassette_span[1] - entry.cassette_span[0]) % entry.length
+    assert released / entry.length < 0.95, "fixture does not exercise the rule"

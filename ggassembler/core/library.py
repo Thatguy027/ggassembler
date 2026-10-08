@@ -654,6 +654,23 @@ def _marker_position(record: SeqRecord) -> int | None:
     return None
 
 
+#: How much of itself a plasmid has to release before the piece that comes out
+#: is read as the vector rather than an insert. Measured, not guessed: across a
+#: 589-plasmid library the largest cassette releases 67% and the smallest
+#: acceptor 72%, so anything in that gap separates them. Raising it past 72%
+#: starts dropping real acceptors; lowering it to 50% swept in forty-eight
+#: cassettes that merely had a big coding sequence.
+ACCEPTOR_RELEASE = 0.70
+
+#: And how large it has to be before that fraction means anything. A
+#: destination vector carries a marker, a yeast origin and an E. coli backbone,
+#: so it cannot be small: the smallest in a 589-plasmid library is 3,734 bp.
+#: Without this, any short plasmid whose insert happens to dominate a stub of a
+#: backbone reads as an acceptor - which is how a 1.3 kb synthetic cassette,
+#: carrying 318 bp of backbone, came to be called a destination vector.
+ACCEPTOR_MINIMUM = 3000
+
+
 def analyse_roles(record: SeqRecord, call: TypeCall, scheme: Scheme = YTK) -> _Roles:
     """Entry vector, connector and cassette detection, all via the multigene enzyme."""
     seq = seqio.sequence(record)
@@ -679,7 +696,26 @@ def analyse_roles(record: SeqRecord, call: TypeCall, scheme: Scheme = YTK) -> _R
             # them is a destination vector for the next level up, not a cassette
             # to put into one: it has nothing to contribute until its dropout is
             # replaced. Level 3 offers these as backbones and nothing else.
-            info.roles.append(MULTIGENE_VECTOR if call.reversed_sites else CASSETTE)
+            # Reversed part-enzyme sites say destination vector outright: a
+            # dropout between connector ends has nothing to contribute until
+            # it is replaced.
+            #
+            # A plasmid with no part-enzyme sites at all cannot say that, and
+            # the question is then which of the two pieces is the vector. For
+            # a cassette the multigene enzyme releases its transcription unit
+            # and leaves the E. coli backbone behind; for a destination vector
+            # it releases the backbone and leaves a stuffer. So the fraction
+            # of the plasmid that comes out decides it, and the two
+            # populations are far apart: in a real library the cassettes reach
+            # 67% at the largest - a Cas9 insert in a small backbone - and the
+            # acceptors start at 72%, most of them above 90%.
+            acceptor = call.reversed_sites
+            if not acceptor and not call.five_prime and len(seq) >= ACCEPTOR_MINIMUM:
+                acceptor = (
+                    (released.end - released.start) % len(seq) / len(seq)
+                    > ACCEPTOR_RELEASE
+                )
+            info.roles.append(MULTIGENE_VECTOR if acceptor else CASSETTE)
             info.cassette_overhangs = (five, three)
             info.cassette_span = (released.start, released.end)
 

@@ -429,6 +429,12 @@ usually differs per unit, since each one integrates at a different locus;
 origin and backbone rarely do. Left on *Choose for me* it takes the simplest
 usable part, which is what it always did.
 
+A destination vector does not need BsaI sites to be offered. One that has
+none - a ConLS'/ConRE' acceptor with a stuffer between its connector ends - is
+recognised by what the BsmBI digest releases: a backbone releases itself and
+keeps the stuffer, while a cassette releases its transcription unit and keeps
+the E. coli backbone.
+
 If a backbone cannot work it says which part is missing — *"nothing in the
 library ends a unit at CTGA (ConLS) … you would need a type 5 part releasing
 CTGA"*. For the multi-round pMYT destinations that is usually a ConLS′ or
