@@ -796,6 +796,7 @@ function renderStage(result) {
 
   el('export-btn').disabled = !result.ok;
   el('protocol-btn').disabled = !result.ok;
+  el('save-btn').disabled = !result.ok;
 }
 
 // ------------------------------------------------------------------ finder ---
@@ -1536,7 +1537,15 @@ async function loadSaved() {
 let savedDesigns = [];
 
 function wireSaved() {
-  el('save-btn').addEventListener('click', async () => {
+  /* Two different saves, which is why they are two buttons now.
+   *
+   * A design is the eight choices, so you can come back to them. A construct
+   * is a plasmid in your library. This screen offered only the first, labelled
+   * "Save", while Level 1 and Level 3 both said "Save to library" and meant
+   * it - so pressing Save here looked like it had added a cassette and had
+   * not. /api/level2/save existed and was tested the whole time; nothing
+   * called it. */
+  el('save-design-btn').addEventListener('click', async () => {
     const name = prompt('Save this design as:', state.name || 'cassette');
     if (!name || !name.trim()) return;
     await post('/api/library/designs', {
@@ -1544,6 +1553,31 @@ function wireSaved() {
     });
     await loadSaved();
     el('saved-select').value = name.trim();
+  });
+
+  el('save-btn').addEventListener('click', async () => {
+    const button = el('save-btn');
+    button.disabled = true;
+    const was = button.textContent;
+    button.textContent = 'Saving\u2026';
+    try {
+      const body = await post('/api/level2/save', state);
+      if (body.ok) {
+        button.textContent = `Saved ${body.name}`;
+        await refresh();
+        setTimeout(() => { button.textContent = was; }, 2500);
+      } else {
+        button.textContent = was;
+        window.alert(
+          'Not saved. The assembly has to be valid first:\n\n'
+          + (body.issues || []).map((i) => `\u2022 ${i.message || i}`).join('\n'));
+      }
+    } catch (error) {
+      button.textContent = was;
+      window.alert(`Not saved: ${error.message || error}`);
+    } finally {
+      button.disabled = false;
+    }
   });
 
   el('saved-select').addEventListener('change', async () => {

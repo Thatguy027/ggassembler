@@ -477,3 +477,37 @@ def test_the_library_table_does_not_render_every_row_at_once():
     assert "CHUNK" in source, "the table renders every matching row at once"
     assert "slice(0, shownCount)" in source, "no window on the rendered rows"
     assert re.search(r"setTimeout\(renderRows", source), "the filter is not debounced"
+
+
+def _without_comments(source: str) -> str:
+    """JavaScript with /* block */ and // line comments removed."""
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+    return re.sub(r"^\s*//.*$", "", source, flags=re.MULTILINE)
+
+
+def test_every_save_endpoint_is_reachable_from_its_screen():
+    """An endpoint nothing calls is a feature that does not exist.
+
+    /api/level2/save wrote the cassette into the library, was tested, and was
+    wired to no button at all: the Cassette screen's "Save" saved a *design*
+    through /api/library/designs, so pressing it looked like it had added a
+    plasmid and had not. Level 1 and Level 3 both said "Save to library" and
+    did it. This checks each screen reaches its own save.
+    """
+    offences = []
+    for level in LEVEL_DIRS:
+        source = "\n".join(_without_comments(p.read_text(encoding="utf-8"))
+                           for p in sorted((WEB / level).glob("*.js")))
+        # Comments stripped first: the comment explaining this bug names the
+        # endpoint, and a test that reads its own explanation as evidence
+        # passes while the button is still dead.
+        if f"/api/{level}/save" not in source:
+            offences.append(f"web/{level}/ never calls /api/{level}/save")
+    assert not offences, "unreachable save endpoints:\n" + "\n".join(offences)
+
+
+def test_saving_a_design_and_saving_a_plasmid_are_different_controls():
+    """They were one button on Level 2, and the one it did was the lesser."""
+    html = (WEB / "level2" / "index.html").read_text(encoding="utf-8")
+    assert 'id="save-design-btn"' in html and 'id="save-btn"' in html
+    assert "Save to library" in html, "nothing says where a construct goes"
