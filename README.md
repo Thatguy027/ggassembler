@@ -1,6 +1,6 @@
 # GG Assembler
 
-A local desktop app for designing Golden Gate assemblies in the Yeast
+A local desktop-in-browser app for designing Golden Gate assemblies in the Yeast
 Toolkit (YTK) standard of Lee, DeLoache, Cervantes & Dueber, *ACS Synth. Biol.*
 2015.
 
@@ -12,14 +12,7 @@ and a check of what came back from sequencing.
 
 ## Get started
 
-**No terminal?** Download **GG Assembler** for
-[macOS or Windows](https://github.com/Thatguy027/ggassembler/releases/latest),
-drag it to Applications, and double-click it. It asks for your folder of
-GenBank files the first time and remembers it after that. Nothing else to
-install — no Python, no `pip`.
-
-Everything below is the same app, installed as a command instead. Three
-commands, from nothing to a running app with 192 published plasmids in it:
+Three commands, from nothing to a running app with 192 published plasmids in it:
 
 ```sh
 uv tool install ggassembler
@@ -27,10 +20,13 @@ ggasm init ytk --starter
 ggasm serve ytk
 ```
 
-The last command opens the app in your browser; `ggasm app ytk` opens the same
-app in its own window instead, once `pip install 'ggassembler[desktop]'` has
-supplied the window. That is the whole setup — everything below is detail you
-can read when you need it.
+The last command opens the app in your browser. That is the whole setup —
+everything below is detail you can read when you need it.
+
+If a terminal is the obstacle, the same app also comes as a window you
+double-click: see [without a terminal](#without-a-terminal) below. Neither
+route replaces the other, and both drive the same screens over the same
+library.
 
 **[Read the guide](GUIDE.md)** for how to actually use it: getting a library,
 adding plasmids, building a part, a cassette and a multigene construct, and
@@ -40,6 +36,7 @@ checking what came back from sequencing.
 |---|---|
 | **Already have plasmids?** | `ggasm serve /path/to/your/genbank/folder` |
 | **Want a window, not a tab?** | `pip install 'ggassembler[desktop]'`, then `ggasm app <folder>` |
+| **Never opening a terminal?** | [Download the app](#without-a-terminal) — no Python, no `pip` |
 | **Joining a lab?** | `ggasm init plasmids --from git@github.com:<org>/<library>.git` |
 | **Working on the app itself?** | `uv sync && uv run ggasm serve <folder> --reload` |
 | **Need Python?** | 3.11 or newer. [uv](https://docs.astral.sh/uv/) installs it for you. |
@@ -49,6 +46,28 @@ checking what came back from sequencing.
 Nothing is uploaded anywhere. The app runs on your machine, reads your files,
 and only talks to the network if you ask it to search UniProt or share a
 library with your lab.
+
+## Without a terminal
+
+An option, not a replacement: the browser app above is unchanged, and the two
+read and write the same library.
+
+Download **GG Assembler** for
+[macOS or Windows](https://github.com/Thatguy027/ggassembler/releases/latest),
+drag it to Applications, and double-click it. It asks for your folder of
+GenBank files the first time and remembers it after that — **File ▸ Open
+library** changes it later. Nothing else to install: no Python, no `pip`, no
+terminal left running, and closing the window stops the app.
+
+Already have the command installed? `ggasm app <folder>` is the same window,
+after `pip install 'ggassembler[desktop]'`.
+
+Two things the download does not give you. macOS will say it cannot check the
+app for malicious software, because the bundle is not signed with a paid Apple
+Developer ID — right-click it, choose **Open**, then **Open** again, and macOS
+remembers. And `ggasm` itself is not on your `PATH`, so `ggasm init`, `ggasm
+scan` and `ggasm check` still need the install above; every screen works
+without them.
 
 ---
 
