@@ -7,3 +7,8 @@ dist/
 build/
 .ggasm/
 .DS_Store
+# Cloned at build time by packaging/fetch_seed.py, not kept in the repository:
+# the starter kits have their own, and a second copy here would go stale.
+packaging/seed/
+# Intermediate of packaging/make_icon.py; icon.icns and icon.ico are kept.
+packaging/icon.iconset/

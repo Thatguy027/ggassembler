@@ -35,6 +35,12 @@ jobs:
       - name: Install, with the window and the bundler
         run: uv sync --extra desktop --extra build
 
+      # The bundle is for someone who will not open a terminal, and so cannot
+      # run `ggasm init --starter` to get plasmids. It carries the kits and
+      # lays them down on first launch.
+      - name: Fetch the kits the app ships with
+        run: uv run python packaging/fetch_seed.py
+
       - name: Bundle
         run: uv run pyinstaller packaging/GGAssembler.spec --noconfirm
 

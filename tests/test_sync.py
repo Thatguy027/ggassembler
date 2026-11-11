@@ -402,3 +402,33 @@ def test_init_starter_marks_what_it_clones(lab, monkeypatch, tmp_path):
     cloned.scan()
     assert sync.is_reference(cloned) is True
     assert sync.enabled(cloned) is False
+
+
+def test_missing_git_says_what_to_install(monkeypatch, tmp_path):
+    """"git is not installed" leaves the person to work out the rest.
+
+    This matters most in the downloaded app, which carries its own Python and
+    so looks like something with no prerequisites at all. It cannot install
+    git for them, so the least it can do is name the command.
+    """
+    folder = tmp_path / "plasmids"
+    folder.mkdir()
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+
+    found = sync.status(Library(folder))
+
+    assert not found.available
+    assert found.detail == sync.GIT_MISSING
+    assert "install" in found.fix.lower()
+    assert found.summary() == sync.GIT_MISSING
+
+
+def test_the_fix_names_this_platforms_command(monkeypatch):
+    for platform, osname, expected in (
+        ("darwin", "posix", "xcode-select"),
+        ("win32", "nt", "git-scm.com"),
+        ("linux", "posix", "package manager"),
+    ):
+        monkeypatch.setattr(sync.sys, "platform", platform)
+        monkeypatch.setattr(sync.os, "name", osname)
+        assert expected in sync.git_fix()

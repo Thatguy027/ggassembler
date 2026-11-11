@@ -51,6 +51,14 @@ function render(state, note) {
   el('sync-toggle').checked = !!state.enabled;
   el('sync-now').disabled = !state.available;
 
+  /* Why sharing is off is only half of it. The downloaded app carries its own
+   * Python, so it looks like something with no prerequisites - and it has no
+   * git and cannot get one. Saying which command installs it is the whole
+   * difference between a feature that is missing and one that is broken. */
+  const fix = el('sync-fix');
+  fix.textContent = state.available ? '' : (state.fix || '');
+  fix.hidden = !fix.textContent;
+
   /* The last outcome outlives the request that produced it, so a background
    * push that failed while you were on another screen is still visible when
    * you come back. */

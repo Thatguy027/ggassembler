@@ -22,8 +22,10 @@ between them and their data.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -64,6 +66,8 @@ class Status:
     """Files changed or added locally and never committed."""
     detail: str = ""
     """Why sharing is unavailable, when it is."""
+    fix: str = ""
+    """What to do about it, when there is something to do."""
 
     @property
     def available(self) -> bool:
@@ -89,6 +93,29 @@ def _s(n: int) -> str:
     return "" if n == 1 else "s"
 
 
+#: Said when git is not there. One line for the badge, and the command that
+#: fixes it - the thing the person actually needs and the thing "git is not
+#: installed" leaves them to find out for themselves.
+#:
+#: This matters most in the downloaded app, which carries its own Python and
+#: so looks to its user like something with no prerequisites at all. It has no
+#: git and cannot get one, and a double-clicked app on macOS is handed a bare
+#: PATH, so a git installed under Homebrew is not on it either.
+GIT_MISSING = "sharing needs git, which this app cannot find"
+
+
+def git_fix() -> str:
+    """How to get a git this app will find, on this platform."""
+    if sys.platform == "darwin":
+        return ("Install Apple's command line tools by running "
+                "`xcode-select --install` in Terminal, then start this again.")
+    if os.name == "nt":
+        return ("Install git from https://git-scm.com/download/win, letting it "
+                "add itself to your PATH, then start this again.")
+    return ("Install git with your package manager (for example "
+            "`sudo apt install git`), then start this again.")
+
+
 def git_available() -> bool:
     return shutil.which("git") is not None
 
@@ -96,7 +123,7 @@ def git_available() -> bool:
 def run(repo: Path, *args: str, check: bool = True) -> str:
     """One git command, with its stderr kept for the message if it fails."""
     if not git_available():
-        raise SyncError("git is not installed, so the library cannot be shared")
+        raise SyncError(f"{GIT_MISSING}. {git_fix()}")
     try:
         done = subprocess.run(
             ["git", *args], cwd=repo, capture_output=True, text=True, timeout=TIMEOUT,
@@ -218,7 +245,7 @@ def status(library: Library, fetch: bool = False) -> Status:
     what is already known and a true one only when the person asks for it.
     """
     if not git_available():
-        return Status(detail="git is not installed")
+        return Status(detail=GIT_MISSING, fix=git_fix())
     repo = repo_of(library)
     if repo is None:
         return Status(detail="the library is not in a single git repository")
@@ -341,10 +368,7 @@ def clone(url: str, into: Path) -> Path:
     public keys and shell access rather than about what to do next.
     """
     if not git_available():
-        raise SyncError(
-            "git is not installed. Install it (on macOS, `xcode-select --install`) "
-            "and run this again."
-        )
+        raise SyncError(f"{GIT_MISSING}. {git_fix()}")
     into = Path(into).expanduser().resolve()
     if into.exists() and any(into.iterdir()):
         raise SyncError(f"{into} already exists and is not empty")

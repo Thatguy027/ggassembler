@@ -100,6 +100,61 @@ def test_unreadable_settings_are_not_fatal(settings):
     assert desktop.remembered() == []
 
 
+@pytest.fixture
+def seed(tmp_path, monkeypatch):
+    """A bundled kit, and somewhere for it to be laid down."""
+    source = tmp_path / "bundled-seed"
+    source.mkdir()
+    (source / "pYTK001.gb").write_text("LOCUS pYTK001\n//\n")
+    (source / "README.md").write_text("the published kits\n")
+    target = tmp_path / "Documents" / "GG Assembler Library"
+    monkeypatch.setattr(desktop, "SEED", source)
+    monkeypatch.setattr(desktop, "SEEDED", target)
+    return source, target
+
+
+def test_the_kits_are_laid_down_on_first_launch(seed):
+    source, target = seed
+
+    assert desktop.seed() == [target]
+    assert (target / "pYTK001.gb").read_text() == "LOCUS pYTK001\n//\n"
+    assert (target / "README.md").exists()
+
+
+def test_a_seeded_library_is_not_laid_down_twice(seed):
+    """The second launch must not overwrite what was saved into the first.
+
+    Everything the app saves lands in this folder. Re-copying the kit over it
+    would be indistinguishable from the app deleting someone's constructs.
+    """
+    source, target = seed
+    desktop.seed()
+    (target / "my-cassette.gb").write_text("mine\n")
+
+    assert desktop.seed() == []
+    assert (target / "my-cassette.gb").exists()
+
+
+def test_an_interrupted_copy_does_not_look_seeded(seed, monkeypatch):
+    """Half a kit indexed as a whole one quietly offers fewer parts."""
+    source, target = seed
+    monkeypatch.setattr(
+        desktop.shutil, "copytree",
+        lambda *a, **k: (_ for _ in ()).throw(OSError("out of space")),
+    )
+
+    assert desktop.seed() == []
+    assert not target.exists()
+
+
+def test_nothing_is_laid_down_without_a_bundled_kit(tmp_path, monkeypatch):
+    """A pip install carries no seed and must reach the picker instead."""
+    monkeypatch.setattr(desktop, "SEED", tmp_path / "absent")
+    monkeypatch.setattr(desktop, "SEEDED", tmp_path / "library")
+
+    assert desktop.seed() == []
+
+
 def test_remembering_survives_an_unwritable_home(monkeypatch, tmp_path):
     """Not being able to remember costs the next launch, not this one."""
     monkeypatch.setattr(desktop, "SETTINGS", tmp_path / "nope" / "settings.json")

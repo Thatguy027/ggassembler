@@ -43,6 +43,7 @@ def _state(library: Library, found: sync.Status, last: dict[str, Any] | None) ->
         "enabled": sync.enabled(library),
         "available": found.available,
         "detail": found.detail,
+        "fix": found.fix,
         "summary": found.summary(),
         "remote": found.remote,
         "branch": found.branch,

@@ -44,17 +44,21 @@ ggasm --help
 — an option alongside the install above, not a replacement for it. Get **GG
 Assembler** for macOS or Windows from the
 [releases page](https://github.com/Thatguy027/ggassembler/releases/latest),
-drag it to Applications, and double-click it. It asks for your folder of
-GenBank files the first time and remembers it afterwards, so step 3 is done
-too; everything from [Get a plasmid library](#2-get-a-plasmid-library) onwards
-reads the same, on the same screens.
+drag it to Applications, and double-click it.
+
+It opens with the 192 published plasmids already in it — the app carries the
+kits and copies them to **Documents ▸ GG Assembler Library** the first time it
+runs — so steps 2 and 3 are both done, and you can go straight to
+[Build a part plasmid](#7-build-a-part-plasmid). Read step 2 anyway when you
+want your lab's own library instead, and point the app at it with **File ▸
+Open library**.
 
 <details>
 <summary>What the download does and does not give you</summary>
 
 It is the same app, with Python and everything else already inside it, so
 there is nothing to install and nothing to keep up to date except the app
-itself. Two things are different:
+itself. Three things are different:
 
 - **macOS will say it cannot check the app for malicious software**, because
   the bundle is not signed with a paid Apple Developer ID. Right-click it and
@@ -62,9 +66,17 @@ itself. Two things are different:
 - **`ggasm` is not on your `PATH`.** The command-line pieces of this guide —
   `ggasm init`, `ggasm scan`, `ggasm check` — need the install above. The app
   on its own covers every screen, just not the commands.
+- **Sharing needs `git`**, which the app cannot carry and cannot install for
+  you. [Share your lab's library](#4-share-your-labs-library) is the one step
+  that will not work until you have it; the Library screen names the command.
+  On macOS a `git` installed through Homebrew is not enough on its own — a
+  double-clicked app is handed a bare `PATH` and will not see it.
 
-To point it at a different library afterwards, use **File ▸ Open library**, or
-install the command and run `ggasm app --forget`.
+The copied library is an ordinary folder, which is the point: the app can be
+replaced by the next version without taking your constructs with it, and you
+can put the folder under git later and share it like any other. To point the
+app at a different one, use **File ▸ Open library**, or install the command
+and run `ggasm app --forget`.
 </details>
 
 <details>

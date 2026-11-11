@@ -272,6 +272,14 @@ td.more.is-button { cursor: pointer; text-decoration: underline; }
   user-select: none;
 }
 
+.sync-fix {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  /* The fix is a command to type. Wrapping mid-flag would make it one. */
+  overflow-wrap: break-word;
+}
+
 .sync-last {
   margin: 10px 0 0;
   font-size: 0.85rem;

@@ -25,6 +25,16 @@ datas = [
 ]
 datas += collect_data_files("Bio")
 
+# The starter kits, laid down on first launch so the app opens with plasmids
+# in it. Optional: `pyinstaller` without `packaging/fetch_seed.py` having run
+# builds a working app that asks for a folder instead, which is what the pip
+# install does anyway. A build meant for release runs the fetch first.
+SEED = SPEC_DIR / "seed"
+if SEED.is_dir() and any(SEED.iterdir()):
+    datas.append((str(SEED), "ggassembler/seed"))
+else:
+    print("spec: no packaging/seed - the bundle will ask for a library folder")
+
 hiddenimports = [
     # Imported by name inside uvicorn rather than at the top of a module, so
     # the analysis never sees them.
@@ -54,6 +64,13 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+# The eight-part cassette, drawn by packaging/make_icon.py and committed, so
+# an ordinary build needs neither Pillow nor the script. Windows wants the
+# .ico on the executable itself; macOS wants the .icns on the bundle, below.
+ICNS = SPEC_DIR / "icon.icns"
+ICO = SPEC_DIR / "icon.ico"
+exe_icon = str(ICO) if ICO.exists() else None
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -65,6 +82,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    icon=exe_icon,
 )
 
 coll = COLLECT(
@@ -76,12 +94,10 @@ coll = COLLECT(
     name="GG Assembler",
 )
 
-icon = ROOT / "packaging" / "icon.icns"
-
 app = BUNDLE(
     coll,
     name="GG Assembler.app",
-    icon=str(icon) if icon.exists() else None,
+    icon=str(ICNS) if ICNS.exists() else None,
     bundle_identifier="edu.ucla.ggassembler",
     info_plist={
         "CFBundleName": "GG Assembler",

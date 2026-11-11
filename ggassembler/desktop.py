@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
 import sys
 import threading
@@ -25,6 +26,16 @@ from pathlib import Path
 from typing import Sequence
 
 APP_NAME = "GG Assembler"
+
+#: The kits the bundle carries, laid down on first launch. Only a bundle has
+#: them - `packaging/fetch_seed.py` clones them in at build time - so a pip
+#: install finds nothing here and asks for a folder instead.
+SEED = Path(__file__).resolve().parent / "seed"
+
+#: Where they are laid down. Documents rather than Application Support: this
+#: is the person's own library from the moment it exists, they will be asked
+#: to find it in a file dialog, and they will want to put it under git one day.
+SEEDED = Path.home() / "Documents" / f"{APP_NAME} Library"
 
 #: How long to wait for uvicorn to claim its port before loading the window
 #: anyway. Generous, because the first launch against an unindexed library
@@ -90,6 +101,45 @@ def remember(folders: Sequence[Path]) -> None:
         # Not being able to remember is worth none of the app: the window is
         # already up and the library already works for this session.
         pass
+
+
+def seed() -> list[Path]:
+    """Lay the bundled kits down as a library of the person's own, once.
+
+    The bundle is for someone who will not open a terminal, and that person
+    cannot run ``ggasm init --starter``: without this they would meet a file
+    dialog asking for plasmids they have no way to have got. So the app opens
+    on 192 published plasmids and the picker becomes something they reach for
+    when they have their own library, rather than a wall on first launch.
+
+    Copied out rather than served from inside the bundle. Everything about a
+    library is written to - the index, saved constructs, the build log, the
+    designs - and the bundle is both read-only in principle and replaced
+    wholesale by the next version, which would take every saved construct with
+    it.
+
+    Returns nothing when there is no seed (a pip install) or when the folder
+    already exists, which is the ordinary case from the second launch on: a
+    remembered library is found before this is ever called.
+    """
+    if not SEED.is_dir() or SEEDED.exists():
+        return []
+    try:
+        # copytree to a temporary name and then rename, so a copy interrupted
+        # half way does not leave a folder that looks seeded and is missing
+        # half the kit - the next launch would index it and quietly offer
+        # fewer parts.
+        partial = SEEDED.with_name(SEEDED.name + " (copying)")
+        if partial.exists():
+            shutil.rmtree(partial)
+        partial.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(SEED, partial)
+        partial.rename(SEEDED)
+    except OSError:
+        # A read-only or missing Documents folder is not worth refusing to
+        # start over: the picker is still there, and still works.
+        return []
+    return [SEEDED]
 
 
 def free_port(host: str = "127.0.0.1") -> int:
@@ -181,7 +231,7 @@ def run(
             serve(picked)
 
     def bootstrap(_window: object = None) -> None:
-        where = chosen.folders or remembered() or ask()
+        where = chosen.folders or remembered() or seed() or ask()
         if not where:
             # Nothing to show and nothing to ask: closing the window is the
             # honest response to a cancelled picker on a first launch.

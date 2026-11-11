@@ -38,6 +38,7 @@ desktop = [
     "pywebview>=5.0",
 ]
 build = [
+    "pillow>=10.0",
     "pyinstaller>=6.10",
 ]
 

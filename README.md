@@ -54,20 +54,27 @@ read and write the same library.
 
 Download **GG Assembler** for
 [macOS or Windows](https://github.com/Thatguy027/ggassembler/releases/latest),
-drag it to Applications, and double-click it. It asks for your folder of
-GenBank files the first time and remembers it after that — **File ▸ Open
-library** changes it later. Nothing else to install: no Python, no `pip`, no
-terminal left running, and closing the window stops the app.
+drag it to Applications, and double-click it. Nothing else to install: no
+Python, no `pip`, no terminal left running, and closing the window stops the
+app.
+
+It opens with plasmids already in it. The app carries the published YTK and
+MYT kits and copies them, on first launch, to **Documents ▸ GG Assembler
+Library** — your folder, not a read-only one inside the app, so saved
+constructs survive updating it. **File ▸ Open library** points it at your
+lab's library instead, whenever you have one.
 
 Already have the command installed? `ggasm app <folder>` is the same window,
 after `pip install 'ggassembler[desktop]'`.
 
-Two things the download does not give you. macOS will say it cannot check the
-app for malicious software, because the bundle is not signed with a paid Apple
-Developer ID — right-click it, choose **Open**, then **Open** again, and macOS
-remembers. And `ggasm` itself is not on your `PATH`, so `ggasm init`, `ggasm
+Three things the download does not give you. macOS will say it cannot check
+the app for malicious software, because the bundle is not signed with a paid
+Apple Developer ID — right-click it, choose **Open**, then **Open** again, and
+macOS remembers. `ggasm` itself is not on your `PATH`, so `ggasm init`, `ggasm
 scan` and `ggasm check` still need the install above; every screen works
-without them.
+without them. And **sharing a library needs `git`**, which the app cannot
+carry — the Library screen says which command installs it, and everything
+else keeps working meanwhile.
 
 ---
 
