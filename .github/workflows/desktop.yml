@@ -1,0 +1,97 @@
+name: desktop
+
+# Builds the double-clickable app for people who will never open a terminal.
+# Separate from `release` on purpose: that workflow publishes to PyPI, which
+# cannot be undone, while this one produces files that can be rebuilt and
+# replaced freely. Tying them together would make every bundle failure a
+# blocked release.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+          - os: windows-2025
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Install, with the window and the bundler
+        run: uv sync --extra desktop --extra build
+
+      - name: Bundle
+        run: uv run pyinstaller packaging/GGAssembler.spec --noconfirm
+
+      # A bundle that cannot start is the one failure this workflow exists to
+      # catch, and it is invisible in the build log: PyInstaller reports
+      # success for an app whose first import is missing. GGASM_SELF_TEST
+      # starts the server against a throwaway library and exits without ever
+      # opening a window - it is an environment variable rather than a flag
+      # because a windowed bundle is handed an empty argv.
+      - name: It has to actually start (macOS)
+        if: runner.os == 'macOS'
+        env:
+          GGASM_SELF_TEST: /tmp/empty-library
+        run: |
+          mkdir -p /tmp/empty-library
+          "dist/GG Assembler.app/Contents/MacOS/GG Assembler"
+
+      - name: It has to actually start (Windows)
+        if: runner.os == 'Windows'
+        env:
+          GGASM_SELF_TEST: C:\empty-library
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\empty-library | Out-Null
+          & "dist\GG Assembler\GG Assembler.exe"
+
+      - name: Zip it
+        shell: bash
+        run: |
+          cd dist
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            # ditto rather than zip: it is the only one that keeps the bundle's
+            # symlinks and resource forks intact, and an unzipped .app that
+            # lost them will not launch.
+            ditto -c -k --sequesterRsrc --keepParent "GG Assembler.app" \
+              "../GGAssembler-macos-${{ matrix.arch }}.zip"
+          else
+            7z a "../GGAssembler-windows-${{ matrix.arch }}.zip" "GG Assembler"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: GGAssembler-${{ runner.os }}-${{ matrix.arch }}
+          path: GGAssembler-*.zip
+
+  attach:
+    # Only for a tag: a manual run is a rehearsal and should not touch a
+    # release page.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: bundle
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: bundles/
+          merge-multiple: true
+
+      - name: Attach the bundles to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" bundles/*.zip --clobber --repo "$GITHUB_REPOSITORY"

@@ -34,6 +34,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+desktop = [
+    "pywebview>=5.0",
+]
+build = [
+    "pyinstaller>=6.10",
+]
 
 [project.urls]
 Homepage = "https://github.com/Thatguy027/ggassembler"
@@ -49,8 +55,8 @@ ggasm = "ggassembler.cli:main"
 # git does not ignore", which swept in a folder of working notes that are not
 # ignored because they were never meant to be committed either - and a PyPI
 # release cannot be taken back once it is up.
-include = ["ggassembler", "tests", "README.md", "GUIDE.md", "LICENSE",
-           "environment.yml", "pyproject.toml"]
+include = ["ggassembler", "tests", "packaging", "README.md", "GUIDE.md",
+           "LICENSE", "environment.yml", "pyproject.toml"]
 
 [tool.hatch.build.targets.wheel]
 # `packages` already carries everything under ggassembler/, web/ included.

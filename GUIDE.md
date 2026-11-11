@@ -19,6 +19,33 @@ version is not enough.
 
 ## 1. Install the app
 
+**If you would rather not use a terminal at all**, download **GG Assembler**
+for macOS or Windows from the
+[releases page](https://github.com/Thatguy027/ggassembler/releases/latest),
+drag it to Applications, and double-click it. It asks for your folder of
+GenBank files the first time and remembers it afterwards, so steps 1 and 3 of
+this guide are both done — skip to
+[Get a plasmid library](#2-get-a-plasmid-library) for how to get a folder worth
+pointing it at.
+
+<details>
+<summary>What the download does and does not give you</summary>
+
+It is the same app, with Python and everything else already inside it, so
+there is nothing to install and nothing to keep up to date except the app
+itself. Two things are different:
+
+- **macOS will say it cannot check the app for malicious software**, because
+  the bundle is not signed with a paid Apple Developer ID. Right-click it and
+  choose **Open**, then **Open** again; macOS remembers the decision.
+- **`ggasm` is not on your `PATH`.** The command-line pieces of this guide —
+  `ggasm init`, `ggasm scan`, `ggasm check` — need the install below. The app
+  on its own covers every screen, just not the commands.
+
+To point it at a different library afterwards, use **File ▸ Open library**, or
+install the command and run `ggasm app --forget`.
+</details>
+
 If your lab works in conda, use the environment file — it pins the Python
 version and brings `git`, which the app needs for sharing a library and which
 pip will not install for you:
@@ -128,6 +155,19 @@ ggasm serve ytk
 
 It opens in your browser. Leave the terminal running — closing it stops the app.
 Press `Ctrl-C` there when you are finished.
+
+For a window of its own instead of a browser tab, once you have installed the
+window with `pip install 'ggassembler[desktop]'`:
+
+```sh
+ggasm app ytk
+```
+
+Everything on every screen is the same. The difference is that the window
+remembers the folder, so after the first time `ggasm app` on its own is
+enough, and closing the window stops the app — there is no terminal to go back
+to. (The downloaded **GG Assembler** from step 1 is exactly this, with Python
+already inside it.)
 
 Which folder you serve decides everything downstream — what you can pick from,
 and where anything you save ends up:

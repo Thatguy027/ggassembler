@@ -60,6 +60,18 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--starter", action="store_true",
                       help="clone the published YTK and MYT kits instead")
 
+    app = sub.add_parser(
+        "app", help="open the app in its own window, without a browser")
+    app.add_argument("folder", type=Path, nargs="*",
+                     help="library folder(s); omitted, it asks, then remembers")
+    app.add_argument("--no-recursive", dest="recursive", action="store_false")
+    app.add_argument("--cache-dir", type=Path, default=None,
+                     help="where to keep the index (default: .ggasm/ beside the library)")
+    app.add_argument("--data-dir", type=Path, default=None,
+                     help="where to keep shared curation (default: ggasm/ beside the library)")
+    app.add_argument("--forget", action="store_true",
+                     help="ask for the library again instead of using the remembered one")
+
     serve = sub.add_parser("serve", help="start the app and open it in a browser")
     serve.add_argument("folder", type=Path, nargs="+", help="library folder(s) to index")
     serve.add_argument("--port", type=int, default=8737)
@@ -137,6 +149,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init(args)
     if args.command == "serve":
         return cmd_serve(args)
+    if args.command == "app":
+        return cmd_app(args)
     parser.print_help()
     return 0
 
@@ -348,6 +362,26 @@ def _port_in_use(host: str, port: int) -> bool:
         except OSError:
             return True
     return False
+
+
+def cmd_app(args: argparse.Namespace) -> int:
+    """Open the app in a native window instead of a browser tab."""
+    from . import desktop
+
+    for folder in args.folder:
+        if not folder.is_dir():
+            print(f"not a folder: {folder}", file=sys.stderr)
+            return 2
+
+    if args.forget:
+        desktop.SETTINGS.unlink(missing_ok=True)
+
+    return desktop.run(
+        args.folder,
+        recursive=args.recursive,
+        cache_dir=args.cache_dir,
+        data_dir=args.data_dir,
+    )
 
 
 def cmd_serve(args: argparse.Namespace) -> int:

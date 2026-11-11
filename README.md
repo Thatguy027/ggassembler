@@ -1,6 +1,6 @@
 # GG Assembler
 
-A local desktop-in-browser app for designing Golden Gate assemblies in the Yeast
+A local desktop app for designing Golden Gate assemblies in the Yeast
 Toolkit (YTK) standard of Lee, DeLoache, Cervantes & Dueber, *ACS Synth. Biol.*
 2015.
 
@@ -12,7 +12,14 @@ and a check of what came back from sequencing.
 
 ## Get started
 
-Three commands, from nothing to a running app with 192 published plasmids in it:
+**No terminal?** Download **GG Assembler** for
+[macOS or Windows](https://github.com/Thatguy027/ggassembler/releases/latest),
+drag it to Applications, and double-click it. It asks for your folder of
+GenBank files the first time and remembers it after that. Nothing else to
+install — no Python, no `pip`.
+
+Everything below is the same app, installed as a command instead. Three
+commands, from nothing to a running app with 192 published plasmids in it:
 
 ```sh
 uv tool install ggassembler
@@ -20,8 +27,10 @@ ggasm init ytk --starter
 ggasm serve ytk
 ```
 
-The last command opens the app in your browser. That is the whole setup —
-everything below is detail you can read when you need it.
+The last command opens the app in your browser; `ggasm app ytk` opens the same
+app in its own window instead, once `pip install 'ggassembler[desktop]'` has
+supplied the window. That is the whole setup — everything below is detail you
+can read when you need it.
 
 **[Read the guide](GUIDE.md)** for how to actually use it: getting a library,
 adding plasmids, building a part, a cassette and a multigene construct, and
@@ -30,6 +39,7 @@ checking what came back from sequencing.
 | | |
 |---|---|
 | **Already have plasmids?** | `ggasm serve /path/to/your/genbank/folder` |
+| **Want a window, not a tab?** | `pip install 'ggassembler[desktop]'`, then `ggasm app <folder>` |
 | **Joining a lab?** | `ggasm init plasmids --from git@github.com:<org>/<library>.git` |
 | **Working on the app itself?** | `uv sync && uv run ggasm serve <folder> --reload` |
 | **Need Python?** | 3.11 or newer. [uv](https://docs.astral.sh/uv/) installs it for you. |
